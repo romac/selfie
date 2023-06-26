@@ -23,7 +23,7 @@ macro_rules! eat_match {
 
 use core::fmt;
 
-use crate::ast::*;
+use crate::ast::{FnCall, If, Let, *};
 use crate::lexer::{lex, Token};
 
 #[derive(Debug)]
@@ -159,7 +159,7 @@ fn parse_call_or_var(tokens: &mut TokenStream) -> Result<Expr, ParseError> {
 
 fn parse_call(tokens: &mut TokenStream, name: Name) -> Result<Expr, ParseError> {
     let args = parse_args(tokens)?;
-    Ok(Expr::FnCall { name, args })
+    Ok(Expr::FnCall(FnCall { name, args }))
 }
 
 fn parse_let(tokens: &mut TokenStream) -> Result<Expr, ParseError> {
@@ -169,7 +169,7 @@ fn parse_let(tokens: &mut TokenStream) -> Result<Expr, ParseError> {
     let value = Box::new(parse_expr_inner(tokens)?);
     let body = Box::new(parse_expr_inner(tokens)?);
 
-    Ok(Expr::Let { name, value, body })
+    Ok(Expr::Let(Let { name, value, body }))
 }
 
 fn parse_if(tokens: &mut TokenStream) -> Result<Expr, ParseError> {
@@ -179,7 +179,7 @@ fn parse_if(tokens: &mut TokenStream) -> Result<Expr, ParseError> {
     tokens.eat(Token::Else)?;
     let els = parse_block(tokens)?;
 
-    Ok(Expr::If { cnd, thn, els })
+    Ok(Expr::If(If { cnd, thn, els }))
 }
 
 fn parse_args(tokens: &mut TokenStream) -> Result<Vec<Arg>, ParseError> {

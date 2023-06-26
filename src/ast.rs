@@ -47,7 +47,7 @@ pub enum Decl {
 }
 
 #[derive(Debug)]
-pub enum BinOp {
+pub enum Op2 {
     Add,
     Sub,
     Mul,
@@ -64,29 +64,41 @@ pub enum BinOp {
 }
 
 #[derive(Debug)]
+pub struct FnCall {
+    pub name: Name,
+    pub args: Vec<Arg>,
+}
+
+#[derive(Debug)]
+pub struct Let {
+    pub name: Name,
+    pub value: Box<Expr>,
+    pub body: Box<Expr>,
+}
+
+#[derive(Debug)]
+pub struct If {
+    pub cnd: Box<Expr>,
+    pub thn: Vec<Expr>,
+    pub els: Vec<Expr>,
+}
+
+#[derive(Debug)]
+pub struct BinOp {
+    pub op: Op2,
+    pub lhs: Box<Expr>,
+    pub rhs: Box<Expr>,
+}
+
+#[derive(Debug)]
 pub enum Expr {
     Int64(i64),
     Float64(f64),
     String(String),
     Var(Name),
-    FnCall {
-        name: Name,
-        args: Vec<Arg>,
-    },
-    Let {
-        name: Name,
-        value: Box<Expr>,
-        body: Box<Expr>,
-    },
-    BinOp {
-        op: BinOp,
-        lhs: Box<Expr>,
-        rhs: Box<Expr>,
-    },
-    If {
-        cnd: Box<Expr>,
-        thn: Vec<Expr>,
-        els: Vec<Expr>,
-    },
+    FnCall(FnCall),
+    Let(Let),
+    BinOp(BinOp),
+    If(If),
     Return(Box<Expr>),
 }
