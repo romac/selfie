@@ -23,6 +23,8 @@ pub enum Token {
     Bool(bool),
     String(String),
     Fn,
+    Struct,
+    Enum,
     Let,
     If,
     Else,
@@ -88,6 +90,14 @@ fn lex_fn(input: &str) -> IResult<&str, Token> {
     value(Token::Fn, tag("fn"))(input)
 }
 
+fn lex_struct(input: &str) -> IResult<&str, Token> {
+    value(Token::Struct, tag("struct"))(input)
+}
+
+fn lex_enum(input: &str) -> IResult<&str, Token> {
+    value(Token::Enum, tag("enum"))(input)
+}
+
 fn lex_let(input: &str) -> IResult<&str, Token> {
     value(Token::Let, tag("let"))(input)
 }
@@ -141,6 +151,8 @@ fn lex_token(input: &str) -> IResult<&str, Token> {
         multispace0,
         alt((
             lex_fn,
+            lex_struct,
+            lex_enum,
             lex_let,
             lex_if,
             lex_else,

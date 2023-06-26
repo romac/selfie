@@ -37,13 +37,36 @@ pub struct Module {
 }
 
 #[derive(Debug)]
+pub struct FnDecl {
+    pub name: Name,
+    pub params: Vec<Param>,
+    pub return_type: Type,
+    pub body: Vec<Expr>,
+}
+
+#[derive(Debug)]
+pub struct StructDecl {
+    pub name: Name,
+    pub fields: Vec<Param>,
+}
+
+#[derive(Debug)]
+pub struct EnumDecl {
+    pub name: Name,
+    pub variants: Vec<Variant>,
+}
+
+#[derive(Debug)]
+pub struct Variant {
+    pub name: Name,
+    pub ty: Type,
+}
+
+#[derive(Debug)]
 pub enum Decl {
-    Fn {
-        name: Name,
-        params: Vec<Param>,
-        return_type: Type,
-        body: Vec<Expr>,
-    },
+    Fn(FnDecl),
+    Struct(StructDecl),
+    Enum(EnumDecl),
 }
 
 #[derive(Debug)]

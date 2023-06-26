@@ -23,7 +23,7 @@ macro_rules! eat_match {
 
 use core::fmt;
 
-use crate::ast::{FnCall, If, Let, *};
+use crate::ast::{FnCall, FnDecl, If, Let, *};
 use crate::lexer::{lex, Token};
 
 #[derive(Debug)]
@@ -69,6 +69,9 @@ fn parse_decls(tokens: Vec<Token>) -> Result<Vec<Decl>, ParseError> {
 fn parse_decl(tokens: &mut TokenStream) -> Result<Option<Decl>, ParseError> {
     match tokens.peek() {
         Some(Token::Fn) => parse_fn_decl(tokens).map(Some),
+        Some(Token::Struct) => parse_struct_decl(tokens).map(Some),
+        Some(Token::Enum) => parse_enum_decl(tokens).map(Some),
+        Some(other) => Err(ParseError::UnexpectedToken(other.clone())),
         _ => Ok(None),
     }
 }
@@ -87,12 +90,30 @@ fn parse_fn_decl(tokens: &mut TokenStream) -> Result<Decl, ParseError> {
 
     let body = parse_block(tokens)?;
 
-    Ok(Decl::Fn {
+    Ok(Decl::Fn(FnDecl {
         name,
         params,
         return_type,
         body,
-    })
+    }))
+}
+
+fn parse_struct_decl(tokens: &mut TokenStream) -> Result<Decl, ParseError> {
+    tokens.eat(Token::Struct)?;
+    let name = parse_name(tokens)?;
+    tokens.eat(Token::BraceOpen)?;
+    let fields = parse_fields(tokens)?;
+    tokens.eat(Token::BraceClose)?;
+    Ok(Decl::Struct(StructDecl { name, fields }))
+}
+
+fn parse_enum_decl(tokens: &mut TokenStream) -> Result<Decl, ParseError> {
+    tokens.eat(Token::Enum)?;
+    let name = parse_name(tokens)?;
+    tokens.eat(Token::BraceOpen)?;
+    let variants = parse_variants(tokens)?;
+    tokens.eat(Token::BraceClose)?;
+    Ok(Decl::Enum(EnumDecl { name, variants }))
 }
 
 fn parse_name(tokens: &mut TokenStream) -> Result<Name, ParseError> {
@@ -268,6 +289,64 @@ fn parse_param(tokens: &mut TokenStream) -> Result<Option<Param>, ParseError> {
     }
 }
 
+fn parse_fields(tokens: &mut TokenStream) -> Result<Vec<Param>, ParseError> {
+    let mut params = Vec::new();
+
+    while let Some(param) = parse_field(tokens)? {
+        params.push(param);
+
+        if tokens.peek() == Some(&Token::Comma) {
+            tokens.next();
+        }
+    }
+
+    Ok(params)
+}
+
+fn parse_field(tokens: &mut TokenStream) -> Result<Option<Param>, ParseError> {
+    match tokens.peek() {
+        Some(Token::BraceClose) => Ok(None),
+        _ => {
+            let name = parse_name(tokens)?;
+            tokens.eat(Token::Colon)?;
+            let ty = parse_type(tokens)?;
+            let param = Param {
+                name,
+                ty,
+                anon: false,
+            };
+            Ok(Some(param))
+        }
+    }
+}
+
+fn parse_variants(tokens: &mut TokenStream) -> Result<Vec<Variant>, ParseError> {
+    let mut variants = Vec::new();
+    while let Some(variant) = parse_variant(tokens)? {
+        variants.push(variant);
+
+        if tokens.peek() == Some(&Token::Comma) {
+            tokens.next();
+        }
+    }
+
+    Ok(variants)
+}
+
+fn parse_variant(tokens: &mut TokenStream) -> Result<Option<Variant>, ParseError> {
+    match tokens.peek() {
+        Some(Token::BraceClose) => Ok(None),
+        _ => {
+            let name = parse_name(tokens)?;
+            tokens.eat(Token::ParenOpen)?;
+            let ty = parse_type(tokens)?;
+            tokens.eat(Token::ParenClose)?;
+            let variant = Variant { name, ty };
+            Ok(Some(variant))
+        }
+    }
+}
+
 trait TokenStreamExt {
     fn eat(&mut self, token: Token) -> Result<(), ParseError>;
 
@@ -311,8 +390,10 @@ mod tests {
             let path = example.path();
             if path.extension().unwrap() == "self" {
                 println!("Parsing {:?}", path);
-                let module = parse_file(path).unwrap();
-                dbg!(module);
+                match parse_file(path) {
+                    Ok(module) => println!("{module:#?}"),
+                    Err(e) => println!("{e}"),
+                }
             }
         }
     }
