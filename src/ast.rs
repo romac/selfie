@@ -105,6 +105,11 @@ pub struct MethodCall {
     pub args: Vec<Arg>,
 }
 
+#[derive(Debug)]
+pub struct FieldAccess {
+    pub receiver: Box<Expr>,
+    pub name: Name,
+}
 
 #[derive(Debug)]
 pub struct Let {
@@ -148,6 +153,7 @@ pub enum Expr {
     Var(Name),
     FnCall(FnCall),
     MethodCall(MethodCall),
+    FieldAccess(FieldAccess),
     Let(Let),
     BinOp(BinOp),
     If(If),

@@ -212,7 +212,7 @@ fn parse_subfactor(tokens: &mut TokenStream) -> Result<Expr, ParseError> {
 
 fn parse_subfactor0(tokens: &mut TokenStream, lhs: Expr) -> Result<Expr, ParseError> {
     match tokens.peek() {
-        Some(Token::Dot) => parse_method_call(tokens, lhs),
+        Some(Token::Dot) => parse_field_access_or_method_call(tokens, lhs),
         _ => Ok(lhs)
     }
 }
@@ -277,6 +277,7 @@ fn parse_string(tokens: &mut TokenStream) -> Result<Expr, ParseError> {
 
 fn parse_call_or_var_or_enum_init(tokens: &mut TokenStream) -> Result<Expr, ParseError> {
     let name = parse_name(tokens)?;
+
     match tokens.peek() {
         Some(Token::ParenOpen) => parse_call(tokens, name),
         Some(Token::Dot) if name.is_camel_case() => parse_enum_init(tokens, Some(name)),
@@ -289,13 +290,17 @@ fn parse_call(tokens: &mut TokenStream, name: Name) -> Result<Expr, ParseError> 
     Ok(Expr::FnCall(FnCall { name, args }))
 }
 
-fn parse_method_call(tokens: &mut TokenStream, receiver: Expr) -> Result<Expr, ParseError> {
+fn parse_field_access_or_method_call(tokens: &mut TokenStream, receiver: Expr) -> Result<Expr, ParseError> {
     tokens.eat(Token::Dot)?;
 
     let name = parse_name(tokens)?;
-    let args = parse_args(tokens)?;
+    let expr = if let Some(Token::ParenOpen) = tokens.peek() {
+        let args = parse_args(tokens)?;
+        Expr::MethodCall(MethodCall { receiver: Box::new(receiver), name, args })
+    } else {
+        Expr::FieldAccess(FieldAccess { receiver: Box::new(receiver), name })
+    };
 
-    let expr = Expr::MethodCall(MethodCall { receiver: Box::new(receiver), name, args });
     parse_subfactor0(tokens, expr)
 }
 
