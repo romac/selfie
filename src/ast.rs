@@ -146,10 +146,16 @@ pub struct EnumInit {
 }
 
 #[derive(Debug)]
-pub enum Expr {
+pub enum Literal {
     Int64(i64),
     Float64(f64),
+    Bool(bool),
     String(String),
+}
+
+#[derive(Debug)]
+pub enum Expr {
+    Lit(Literal),
     Var(Name),
     FnCall(FnCall),
     MethodCall(MethodCall),
