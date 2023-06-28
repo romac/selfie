@@ -117,11 +117,14 @@ fn parse_type(tokens: &mut TokenStream) -> Result<Type, ParseError> {
 
 fn parse_block(tokens: &mut TokenStream) -> Result<Vec<Expr>, ParseError> {
     tokens.eat(Token::BraceOpen)?;
+
     let mut exprs = Vec::new();
     while let Some(expr) = parse_expr_in_block(tokens)? {
         exprs.push(expr);
     }
+
     tokens.eat(Token::BraceClose)?;
+
     Ok(exprs)
 }
 
@@ -134,7 +137,10 @@ fn parse_expr_in_block(tokens: &mut TokenStream) -> Result<Option<Expr>, ParseEr
 
 fn parse_expr(tokens: &mut TokenStream) -> Result<Expr, ParseError> {
     let lhs = parse_term(tokens)?;
+    parse_expr0(tokens, lhs)
+}
 
+fn parse_expr0(tokens: &mut TokenStream, lhs: Expr) -> Result<Expr, ParseError> {
     match tokens.peek() {
         Some(Token::Plus | Token::Dash) => parse_binop_term(tokens, lhs),
         _ => Ok(lhs)
@@ -143,7 +149,10 @@ fn parse_expr(tokens: &mut TokenStream) -> Result<Expr, ParseError> {
 
 fn parse_term(tokens: &mut TokenStream) -> Result<Expr, ParseError> {
     let lhs = parse_factor(tokens)?;
+    parse_term0(tokens, lhs)
+}
 
+fn parse_term0(tokens: &mut TokenStream, lhs: Expr) -> Result<Expr, ParseError> {
     match tokens.peek() {
         Some(Token::Star | Token::Slash) => parse_binop_factor(tokens, lhs),
         _ => Ok(lhs)
@@ -151,27 +160,20 @@ fn parse_term(tokens: &mut TokenStream) -> Result<Expr, ParseError> {
 }
 
 fn parse_binop_term(tokens: &mut TokenStream, lhs: Expr) -> Result<Expr, ParseError> {
+    if tokens.peek().is_none() {
+        return Ok(lhs);
+    }
+
     let op = eat_match!(
         tokens,
         Token::Plus => Op2::Add,
         Token::Dash => Op2::Sub,
     );
 
-    let rhs = parse_term(tokens)?;
-    let binop = BinOp { op, lhs: Box::new(lhs), rhs: Box::new(rhs) };
-    Ok(Expr::BinOp(binop))
-}
-
-fn parse_binop_factor(tokens: &mut TokenStream, lhs: Expr) -> Result<Expr, ParseError> {
-    let op = eat_match!(
-        tokens,
-        Token::Star => Op2::Mul,
-        Token::Slash => Op2::Div
-    );
-
     let rhs = parse_factor(tokens)?;
-    let binop = BinOp { op, lhs: Box::new(lhs), rhs: Box::new(rhs) };
-    Ok(Expr::BinOp(binop))
+    let expr = Expr::BinOp(BinOp { op, lhs: Box::new(lhs), rhs: Box::new(rhs) });
+
+    parse_expr0(tokens, expr)
 }
 
 fn parse_factor(tokens: &mut TokenStream) -> Result<Expr, ParseError> {
@@ -181,15 +183,41 @@ fn parse_factor(tokens: &mut TokenStream) -> Result<Expr, ParseError> {
 
 fn parse_factor0(tokens: &mut TokenStream, lhs: Expr) -> Result<Expr, ParseError> {
     match tokens.peek() {
-        Some(Token::Dot) => {
-            let expr = parse_method_call(tokens, lhs)?;
-            parse_factor0(tokens, expr)
-        },
+        Some(Token::Star | Token::Slash) => parse_binop_factor(tokens, lhs),
         _ => Ok(lhs)
     }
 }
 
+fn parse_binop_factor(tokens: &mut TokenStream, lhs: Expr) -> Result<Expr, ParseError> {
+    if tokens.peek().is_none() {
+        return Ok(lhs);
+    }
+
+    let op = eat_match!(
+        tokens,
+        Token::Star => Op2::Mul,
+        Token::Slash => Op2::Div
+    );
+
+    let rhs = parse_subfactor(tokens)?;
+    let expr = Expr::BinOp(BinOp { op, lhs: Box::new(lhs), rhs: Box::new(rhs) });
+
+    parse_factor0(tokens, expr)
+}
+
 fn parse_subfactor(tokens: &mut TokenStream) -> Result<Expr, ParseError> {
+    let lhs = parse_primary(tokens)?;
+    parse_subfactor0(tokens, lhs)
+}
+
+fn parse_subfactor0(tokens: &mut TokenStream, lhs: Expr) -> Result<Expr, ParseError> {
+    match tokens.peek() {
+        Some(Token::Dot) => parse_method_call(tokens, lhs),
+        _ => Ok(lhs)
+    }
+}
+
+fn parse_primary(tokens: &mut TokenStream) -> Result<Expr, ParseError> {
     let expr = match tokens.peek() {
         Some(Token::Int64(_)) => parse_int64(tokens),
         Some(Token::Float64(_)) => parse_float64(tokens),
@@ -267,8 +295,8 @@ fn parse_method_call(tokens: &mut TokenStream, receiver: Expr) -> Result<Expr, P
     let name = parse_name(tokens)?;
     let args = parse_args(tokens)?;
 
-    let call = MethodCall { receiver: Box::new(receiver), name, args };
-    Ok(Expr::MethodCall(call))
+    let expr = Expr::MethodCall(MethodCall { receiver: Box::new(receiver), name, args });
+    parse_subfactor0(tokens, expr)
 }
 
 
@@ -487,8 +515,9 @@ mod tests {
 
     #[test]
     fn parse_arith() {
-        let mut tokens = lex(r#" x + 2 * y - 1"#).unwrap().into_iter().peekable();
+        let mut tokens = lex(r#" x + 2 * y - 3 / 4 + z"#).unwrap().into_iter().peekable();
         let expr = parse_expr(&mut tokens).unwrap();
+        dbg!(&tokens);
         println!("{:#?}", expr);
     }
 }
