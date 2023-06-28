@@ -222,7 +222,7 @@ fn parse_primary(tokens: &mut TokenStream) -> Result<Expr, ParseError> {
         Some(Token::Int64(_)) => parse_int64(tokens),
         Some(Token::Float64(_)) => parse_float64(tokens),
         Some(Token::String(_)) => parse_string(tokens),
-        Some(Token::Identifier(_)) => parse_call_or_var_or_enum_init(tokens),
+        Some(Token::Identifier(_)) => parse_var_or_fn_call_or_enum_init(tokens),
         Some(Token::Dot) => parse_enum_init(tokens, None),
         Some(Token::Let) => parse_let(tokens),
         Some(Token::If) => parse_if(tokens),
@@ -275,17 +275,17 @@ fn parse_string(tokens: &mut TokenStream) -> Result<Expr, ParseError> {
     eat_match!(tokens, Token::String(value) => Ok(Expr::String(value)))
 }
 
-fn parse_call_or_var_or_enum_init(tokens: &mut TokenStream) -> Result<Expr, ParseError> {
+fn parse_var_or_fn_call_or_enum_init(tokens: &mut TokenStream) -> Result<Expr, ParseError> {
     let name = parse_name(tokens)?;
 
     match tokens.peek() {
-        Some(Token::ParenOpen) => parse_call(tokens, name),
+        Some(Token::ParenOpen) => parse_fn_call(tokens, name),
         Some(Token::Dot) if name.is_camel_case() => parse_enum_init(tokens, Some(name)),
         _ => Ok(Expr::Var(name)),
     }
 }
 
-fn parse_call(tokens: &mut TokenStream, name: Name) -> Result<Expr, ParseError> {
+fn parse_fn_call(tokens: &mut TokenStream, name: Name) -> Result<Expr, ParseError> {
     let args = parse_args(tokens)?;
     Ok(Expr::FnCall(FnCall { name, args }))
 }
@@ -294,6 +294,7 @@ fn parse_field_access_or_method_call(tokens: &mut TokenStream, receiver: Expr) -
     tokens.eat(Token::Dot)?;
 
     let name = parse_name(tokens)?;
+
     let expr = if let Some(Token::ParenOpen) = tokens.peek() {
         let args = parse_args(tokens)?;
         Expr::MethodCall(MethodCall { receiver: Box::new(receiver), name, args })
