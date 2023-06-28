@@ -227,12 +227,7 @@ fn parse_primary(tokens: &mut TokenStream) -> Result<Expr, ParseError> {
         Some(Token::Dot) => parse_enum_init(tokens, None),
         Some(Token::Let) => parse_let(tokens),
         Some(Token::If) => parse_if(tokens),
-        Some(Token::ParenOpen) => {
-            tokens.next();
-            let expr = parse_expr(tokens)?;
-            tokens.eat(Token::ParenClose)?;
-            Ok(expr)
-        }
+        Some(Token::ParenOpen) => parse_unit_parens_or_tuple(tokens),
         Some(token) => Err(ParseError::UnexpectedToken(token.clone())),
         None => Err(ParseError::UnexpectedEof),
     }?;
@@ -287,6 +282,33 @@ fn parse_bool(tokens: &mut TokenStream) -> Result<Expr, ParseError> {
 
 fn parse_string(tokens: &mut TokenStream) -> Result<Expr, ParseError> {
     eat_match!(tokens, Token::String(value) => Ok(Expr::Lit(Literal::String(value))))
+}
+
+fn parse_unit_parens_or_tuple(tokens: &mut TokenStream) -> Result<Expr, ParseError> {
+    tokens.eat(Token::ParenOpen)?;
+
+    let expr = if let Some(Token::ParenClose) = tokens.peek() {
+        Expr::Lit(Literal::Unit)
+    } else {
+        let expr = parse_expr(tokens)?;
+
+        if let Some(Token::Comma) = tokens.peek() {
+            let mut items = vec![expr];
+
+            while let Some(Token::Comma) = tokens.peek() {
+                tokens.next();
+                items.push(parse_expr(tokens)?);
+            }
+
+            Expr::Tuple(Tuple { items })
+        } else {
+            expr
+        }
+    };
+
+    tokens.eat(Token::ParenClose)?;
+
+    Ok(expr)
 }
 
 fn parse_var_or_fn_call_or_init(tokens: &mut TokenStream) -> Result<Expr, ParseError> {

@@ -146,11 +146,17 @@ pub struct EnumInit {
 }
 
 #[derive(Debug)]
+pub struct Tuple {
+    pub items: Vec<Expr>,
+}
+
+#[derive(Debug)]
 pub enum Literal {
     Int64(i64),
     Float64(f64),
     Bool(bool),
     String(String),
+    Unit,
 }
 
 #[derive(Debug)]
@@ -160,6 +166,7 @@ pub enum Expr {
     FnCall(FnCall),
     MethodCall(MethodCall),
     FieldAccess(FieldAccess),
+    Tuple(Tuple),
     Let(Let),
     BinOp(BinOp),
     If(If),
