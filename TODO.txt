@@ -1,0 +1,5 @@
+TODO:
+
+- Replace FieldAccess, FnCall, MethodCall, EnumInit and StructInit with a single Call and Select variant
+- Disambiguate after typing
+
