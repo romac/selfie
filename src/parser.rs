@@ -1,50 +1,29 @@
-//! A nom parser for the following language:
-//!
-//! ```
-//! fn add(_ x: Int64, y: Int64) -> Int64 {
-//!   let z = x + y;
-//!   z
-//! }
-//!
-//! fn main() {
-//!   add(42, y: 123)
-//! }
-//! ```
-
-macro_rules! eat_match {
-    ($tokens:ident, $token:pat => $expr:expr) => {
-        match $tokens.next() {
-            Some($token) => $expr,
-            Some(token) => return Err(ParseError::UnexpectedToken(token)),
-            None => return Err(ParseError::UnexpectedEof),
-        }
-    };
-}
-
 use core::fmt;
 
-use crate::ast::{FnCall, FnDecl, If, Let, *};
+use crate::ast::*;
 use crate::lexer::{lex, Token};
 
 #[derive(Debug)]
 pub enum ParseError {
-    ExpectedToken(Token, Token),
-    UnexpectedToken(Token),
-    UnexpectedEof,
     Lex(String),
+    UnexpectedEof,
+    UnexpectedToken(Token),
+    ExpectedExpr,
     ExpectedIdentifier,
+    ExpectedToken(Token, Token),
 }
 
 impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            ParseError::Lex(msg) => write!(f, "Lex error: {}", msg),
+            ParseError::Lex(msg) => write!(f, "Lex error: {msg}"),
+            ParseError::UnexpectedEof => write!(f, "Unexpected end of file"),
+            ParseError::UnexpectedToken(token) => write!(f, "Unexpected token: {token:?}"),
+            ParseError::ExpectedExpr => write!(f, "Expected expression"),
+            ParseError::ExpectedIdentifier => write!(f, "Expected identifier"),
             ParseError::ExpectedToken(expected, got) => {
                 write!(f, "Expected token {expected:?}, instead got {got:?}")
             }
-            ParseError::UnexpectedToken(token) => write!(f, "Unexpected token: {:?}", token),
-            ParseError::UnexpectedEof => write!(f, "Unexpected end of file"),
-            ParseError::ExpectedIdentifier => write!(f, "Expected identifier"),
         }
     }
 }
@@ -55,6 +34,16 @@ pub fn parse(contents: &str) -> Result<Module, ParseError> {
     let tokens = lex(contents).map_err(|e| ParseError::Lex(e.to_string()))?;
     let decls = parse_decls(tokens)?;
     Ok(Module { decls })
+}
+
+macro_rules! eat_match {
+    ($tokens:ident, $token:pat => $expr:expr) => {
+        match $tokens.next() {
+            Some($token) => $expr,
+            Some(token) => return Err(ParseError::UnexpectedToken(token)),
+            None => return Err(ParseError::UnexpectedEof),
+        }
+    };
 }
 
 fn parse_decls(tokens: Vec<Token>) -> Result<Vec<Decl>, ParseError> {
@@ -150,12 +139,39 @@ fn parse_expr_inner(tokens: &mut TokenStream) -> Result<Expr, ParseError> {
         Some(Token::Int64(_)) => parse_int64(tokens),
         Some(Token::Float64(_)) => parse_float64(tokens),
         Some(Token::String(_)) => parse_string(tokens),
-        Some(Token::Identifier(_)) => parse_call_or_var(tokens),
+        Some(Token::Identifier(_)) => parse_call_or_var_or_enum_init(tokens),
+        Some(Token::Dot) => parse_enum_init(tokens, None),
         Some(Token::Let) => parse_let(tokens),
         Some(Token::If) => parse_if(tokens),
         Some(token) => Err(ParseError::UnexpectedToken(token.clone())),
         None => Err(ParseError::UnexpectedEof),
     }
+}
+
+fn parse_enum_init(tokens: &mut TokenStream, ty: Option<Name>) -> Result<Expr, ParseError> {
+    tokens.eat(Token::Dot)?;
+
+    let variant = parse_name(tokens)?;
+
+    let arg = if let Some(Token::ParenOpen) = tokens.peek() {
+        tokens.eat(Token::ParenOpen)?;
+
+        let Some(arg) = parse_expr(tokens)? else {
+            return Err(ParseError::ExpectedExpr);
+        };
+
+        tokens.eat(Token::ParenClose)?;
+
+        Some(Box::new(arg))
+    } else {
+        None
+    };
+
+    Ok(Expr::EnumInit(EnumInit {
+        ty,
+        variant,
+        arg,
+    }))
 }
 
 fn parse_int64(tokens: &mut TokenStream) -> Result<Expr, ParseError> {
@@ -170,10 +186,11 @@ fn parse_string(tokens: &mut TokenStream) -> Result<Expr, ParseError> {
     eat_match!(tokens, Token::String(value) => Ok(Expr::String(value)))
 }
 
-fn parse_call_or_var(tokens: &mut TokenStream) -> Result<Expr, ParseError> {
+fn parse_call_or_var_or_enum_init(tokens: &mut TokenStream) -> Result<Expr, ParseError> {
     let name = parse_name(tokens)?;
     match tokens.peek() {
         Some(Token::ParenOpen) => parse_call(tokens, name),
+        Some(Token::Dot) if name.is_camel_case() => parse_enum_init(tokens, Some(name)),
         _ => Ok(Expr::Var(name)),
     }
 }
@@ -227,21 +244,20 @@ fn parse_args(tokens: &mut TokenStream) -> Result<Vec<Arg>, ParseError> {
 }
 
 fn parse_arg(tokens: &mut TokenStream) -> Result<Option<Arg>, ParseError> {
-    match tokens.peek() {
-        Some(Token::ParenClose) => Ok(None),
-        _ => {
-            let expr = parse_expr(tokens)?;
+    if let Some(Token::ParenClose) = tokens.peek() {
+        return Ok(None);
+    }
 
-            if tokens.peek() == Some(&Token::Colon) {
-                if let Some(Expr::Var(name)) = expr {
-                    parse_named_arg(tokens, name)
-                } else {
-                    Err(ParseError::ExpectedIdentifier)
-                }
-            } else {
-                Ok(expr.map(Arg::Anon))
-            }
+    let expr = parse_expr(tokens)?;
+
+    if tokens.peek() == Some(&Token::Colon) {
+        if let Some(Expr::Var(name)) = expr {
+            parse_named_arg(tokens, name)
+        } else {
+            Err(ParseError::ExpectedIdentifier)
         }
+    } else {
+        Ok(expr.map(Arg::Anon))
     }
 }
 
@@ -270,23 +286,22 @@ fn parse_params(tokens: &mut TokenStream) -> Result<Vec<Param>, ParseError> {
 }
 
 fn parse_param(tokens: &mut TokenStream) -> Result<Option<Param>, ParseError> {
-    match tokens.peek() {
-        Some(Token::ParenClose) => Ok(None),
-        _ => {
-            let anon = if let Some(Token::Under) = tokens.peek() {
-                tokens.next();
-                true
-            } else {
-                false
-            };
-
-            let name = parse_name(tokens)?;
-            tokens.eat(Token::Colon)?;
-            let ty = parse_type(tokens)?;
-            let param = Param { name, ty, anon };
-            Ok(Some(param))
-        }
+    if let Some(Token::ParenClose) = tokens.peek() {
+        return Ok(None);
     }
+
+    let anon = if let Some(Token::Under) = tokens.peek() {
+        tokens.next();
+        true
+    } else {
+        false
+    };
+
+    let name = parse_name(tokens)?;
+    tokens.eat(Token::Colon)?;
+    let ty = parse_type(tokens)?;
+    let param = Param { name, ty, anon };
+    Ok(Some(param))
 }
 
 fn parse_fields(tokens: &mut TokenStream) -> Result<Vec<Param>, ParseError> {
@@ -304,20 +319,19 @@ fn parse_fields(tokens: &mut TokenStream) -> Result<Vec<Param>, ParseError> {
 }
 
 fn parse_field(tokens: &mut TokenStream) -> Result<Option<Param>, ParseError> {
-    match tokens.peek() {
-        Some(Token::BraceClose) => Ok(None),
-        _ => {
-            let name = parse_name(tokens)?;
-            tokens.eat(Token::Colon)?;
-            let ty = parse_type(tokens)?;
-            let param = Param {
-                name,
-                ty,
-                anon: false,
-            };
-            Ok(Some(param))
-        }
+    if let Some(Token::BraceClose) = tokens.peek() {
+        return Ok(None);
     }
+
+    let name = parse_name(tokens)?;
+    tokens.eat(Token::Colon)?;
+    let ty = parse_type(tokens)?;
+    let param = Param {
+        name,
+        ty,
+        anon: false,
+    };
+    Ok(Some(param))
 }
 
 fn parse_variants(tokens: &mut TokenStream) -> Result<Vec<Variant>, ParseError> {
@@ -337,6 +351,7 @@ fn parse_variant(tokens: &mut TokenStream) -> Result<Option<Variant>, ParseError
     match tokens.peek() {
         Some(Token::BraceClose) => Ok(None),
         _ => {
+            tokens.eat(Token::Dot)?;
             let name = parse_name(tokens)?;
             tokens.eat(Token::ParenOpen)?;
             let ty = parse_type(tokens)?;

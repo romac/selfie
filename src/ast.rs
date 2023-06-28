@@ -1,6 +1,12 @@
 #[derive(Debug)]
 pub struct Name(pub(crate) String);
 
+impl Name {
+    pub fn is_camel_case(&self) -> bool {
+        self.0.chars().next().is_some_and(|c| c.is_uppercase())
+    }
+}
+
 #[derive(Debug)]
 pub enum Type {
     Int64,
@@ -114,6 +120,19 @@ pub struct BinOp {
 }
 
 #[derive(Debug)]
+pub struct StructInit {
+    pub id: Name,
+    pub args: Vec<NamedArg>,
+}
+
+#[derive(Debug)]
+pub struct EnumInit {
+    pub ty: Option<Name>,
+    pub variant: Name,
+    pub arg: Option<Box<Expr>>,
+}
+
+#[derive(Debug)]
 pub enum Expr {
     Int64(i64),
     Float64(f64),
@@ -123,5 +142,7 @@ pub enum Expr {
     Let(Let),
     BinOp(BinOp),
     If(If),
+    StructInit(StructInit),
+    EnumInit(EnumInit),
     Return(Box<Expr>),
 }

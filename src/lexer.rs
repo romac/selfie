@@ -34,6 +34,7 @@ pub enum Token {
     BraceClose,
     Colon,
     Comma,
+    Dot,
     Equals,
     Arrow,
     Under,
@@ -130,6 +131,10 @@ fn lex_colon(input: &str) -> IResult<&str, Token> {
     value(Token::Colon, tag(":"))(input)
 }
 
+fn lex_dot(input: &str) -> IResult<&str, Token> {
+    value(Token::Dot, tag("."))(input)
+}
+
 fn lex_comma(input: &str) -> IResult<&str, Token> {
     value(Token::Comma, tag(","))(input)
 }
@@ -162,6 +167,7 @@ fn lex_token(input: &str) -> IResult<&str, Token> {
             lex_close_brace,
             lex_colon,
             lex_comma,
+            lex_dot,
             lex_equals,
             lex_under,
             lex_arrow,
