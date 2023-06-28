@@ -38,6 +38,10 @@ pub enum Token {
     Equals,
     Arrow,
     Under,
+    Slash,
+    Star,
+    Dash,
+    Plus,
 }
 
 #[derive(Debug)]
@@ -139,6 +143,22 @@ fn lex_comma(input: &str) -> IResult<&str, Token> {
     value(Token::Comma, tag(","))(input)
 }
 
+fn lex_plus(input: &str) -> IResult<&str, Token> {
+    value(Token::Plus, tag("+"))(input)
+}
+
+fn lex_dash(input: &str) -> IResult<&str, Token> {
+    value(Token::Dash, tag("-"))(input)
+}
+
+fn lex_star(input: &str) -> IResult<&str, Token> {
+    value(Token::Star, tag("*"))(input)
+}
+
+fn lex_slash(input: &str) -> IResult<&str, Token> {
+    value(Token::Slash, tag("/"))(input)
+}
+
 fn lex_equals(input: &str) -> IResult<&str, Token> {
     value(Token::Equals, tag("="))(input)
 }
@@ -155,27 +175,35 @@ fn lex_token(input: &str) -> IResult<&str, Token> {
     delimited(
         multispace0,
         alt((
-            lex_fn,
-            lex_struct,
-            lex_enum,
-            lex_let,
-            lex_if,
-            lex_else,
-            lex_open_paren,
-            lex_close_paren,
-            lex_open_brace,
-            lex_close_brace,
-            lex_colon,
-            lex_comma,
-            lex_dot,
-            lex_equals,
-            lex_under,
-            lex_arrow,
-            lex_bool,
-            lex_identifier,
-            lex_float64,
-            lex_int64,
-            // lex_string,
+            alt((
+                lex_fn,
+                lex_struct,
+                lex_enum,
+                lex_let,
+                lex_if,
+                lex_else,
+                lex_open_paren,
+                lex_close_paren,
+                lex_open_brace,
+                lex_close_brace,
+                lex_arrow,
+            )),
+            alt((
+                lex_colon,
+                lex_comma,
+                lex_dot,
+                lex_plus,
+                lex_dash,
+                lex_star,
+                lex_slash,
+                lex_equals,
+                lex_under,
+                lex_bool,
+                lex_identifier,
+                lex_float64,
+                lex_int64,
+                // lex_string,
+            ))
         )),
         multispace0,
     )(input)

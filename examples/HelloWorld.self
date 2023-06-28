@@ -11,7 +11,7 @@ enum Bar {
 fn add(_ x: Int64, y: Int64) -> Int64 {
   let r = Bar.abc
   let s = .abc
-  x
+  x + y
 }
 
 fn main() {

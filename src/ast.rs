@@ -99,6 +99,14 @@ pub struct FnCall {
 }
 
 #[derive(Debug)]
+pub struct MethodCall {
+    pub receiver: Box<Expr>,
+    pub name: Name,
+    pub args: Vec<Arg>,
+}
+
+
+#[derive(Debug)]
 pub struct Let {
     pub name: Name,
     pub value: Box<Expr>,
@@ -139,6 +147,7 @@ pub enum Expr {
     String(String),
     Var(Name),
     FnCall(FnCall),
+    MethodCall(MethodCall),
     Let(Let),
     BinOp(BinOp),
     If(If),
