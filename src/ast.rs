@@ -121,8 +121,8 @@ pub struct Let {
 #[derive(Debug)]
 pub struct If {
     pub cnd: Box<Expr>,
-    pub thn: Vec<Expr>,
-    pub els: Vec<Expr>,
+    pub thn: Box<Expr>,
+    pub els: Box<Expr>,
 }
 
 #[derive(Debug)]

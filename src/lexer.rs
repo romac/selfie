@@ -203,7 +203,7 @@ fn lex_token(input: &str) -> IResult<&str, Token> {
                 lex_float64,
                 lex_int64,
                 // lex_string,
-            ))
+            )),
         )),
         multispace0,
     )(input)

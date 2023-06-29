@@ -143,7 +143,7 @@ fn parse_expr(tokens: &mut TokenStream) -> Result<Expr, ParseError> {
 fn parse_expr0(tokens: &mut TokenStream, lhs: Expr) -> Result<Expr, ParseError> {
     match tokens.peek() {
         Some(Token::Plus | Token::Dash) => parse_binop_term(tokens, lhs),
-        _ => Ok(lhs)
+        _ => Ok(lhs),
     }
 }
 
@@ -155,7 +155,7 @@ fn parse_term(tokens: &mut TokenStream) -> Result<Expr, ParseError> {
 fn parse_term0(tokens: &mut TokenStream, lhs: Expr) -> Result<Expr, ParseError> {
     match tokens.peek() {
         Some(Token::Star | Token::Slash) => parse_binop_factor(tokens, lhs),
-        _ => Ok(lhs)
+        _ => Ok(lhs),
     }
 }
 
@@ -171,7 +171,11 @@ fn parse_binop_term(tokens: &mut TokenStream, lhs: Expr) -> Result<Expr, ParseEr
     );
 
     let rhs = parse_factor(tokens)?;
-    let expr = Expr::BinOp(BinOp { op, lhs: Box::new(lhs), rhs: Box::new(rhs) });
+    let expr = Expr::BinOp(BinOp {
+        op,
+        lhs: Box::new(lhs),
+        rhs: Box::new(rhs),
+    });
 
     parse_expr0(tokens, expr)
 }
@@ -184,7 +188,7 @@ fn parse_factor(tokens: &mut TokenStream) -> Result<Expr, ParseError> {
 fn parse_factor0(tokens: &mut TokenStream, lhs: Expr) -> Result<Expr, ParseError> {
     match tokens.peek() {
         Some(Token::Star | Token::Slash) => parse_binop_factor(tokens, lhs),
-        _ => Ok(lhs)
+        _ => Ok(lhs),
     }
 }
 
@@ -200,7 +204,11 @@ fn parse_binop_factor(tokens: &mut TokenStream, lhs: Expr) -> Result<Expr, Parse
     );
 
     let rhs = parse_subfactor(tokens)?;
-    let expr = Expr::BinOp(BinOp { op, lhs: Box::new(lhs), rhs: Box::new(rhs) });
+    let expr = Expr::BinOp(BinOp {
+        op,
+        lhs: Box::new(lhs),
+        rhs: Box::new(rhs),
+    });
 
     parse_factor0(tokens, expr)
 }
@@ -213,7 +221,7 @@ fn parse_subfactor(tokens: &mut TokenStream) -> Result<Expr, ParseError> {
 fn parse_subfactor0(tokens: &mut TokenStream, lhs: Expr) -> Result<Expr, ParseError> {
     match tokens.peek() {
         Some(Token::Dot) => parse_field_access_or_method_call(tokens, lhs),
-        _ => Ok(lhs)
+        _ => Ok(lhs),
     }
 }
 
@@ -252,20 +260,13 @@ fn parse_enum_init(tokens: &mut TokenStream, ty: Option<Name>) -> Result<Expr, P
         None
     };
 
-    Ok(Expr::EnumInit(EnumInit {
-        ty,
-        variant,
-        arg,
-    }))
+    Ok(Expr::EnumInit(EnumInit { ty, variant, arg }))
 }
 
 fn parse_struct_init(tokens: &mut TokenStream, ty: Name) -> Result<Expr, ParseError> {
     let args = parse_named_args(tokens)?;
 
-    Ok(Expr::StructInit(StructInit {
-        id: ty,
-        args,
-    }))
+    Ok(Expr::StructInit(StructInit { id: ty, args }))
 }
 
 fn parse_int64(tokens: &mut TokenStream) -> Result<Expr, ParseError> {
@@ -327,21 +328,30 @@ fn parse_fn_call(tokens: &mut TokenStream, name: Name) -> Result<Expr, ParseErro
     Ok(Expr::FnCall(FnCall { name, args }))
 }
 
-fn parse_field_access_or_method_call(tokens: &mut TokenStream, receiver: Expr) -> Result<Expr, ParseError> {
+fn parse_field_access_or_method_call(
+    tokens: &mut TokenStream,
+    receiver: Expr,
+) -> Result<Expr, ParseError> {
     tokens.eat(Token::Dot)?;
 
     let name = parse_name(tokens)?;
 
     let expr = if let Some(Token::ParenOpen) = tokens.peek() {
         let args = parse_args(tokens)?;
-        Expr::MethodCall(MethodCall { receiver: Box::new(receiver), name, args })
+        Expr::MethodCall(MethodCall {
+            receiver: Box::new(receiver),
+            name,
+            args,
+        })
     } else {
-        Expr::FieldAccess(FieldAccess { receiver: Box::new(receiver), name })
+        Expr::FieldAccess(FieldAccess {
+            receiver: Box::new(receiver),
+            name,
+        })
     };
 
     parse_subfactor0(tokens, expr)
 }
-
 
 fn parse_let(tokens: &mut TokenStream) -> Result<Expr, ParseError> {
     tokens.eat(Token::Let)?;
@@ -356,9 +366,9 @@ fn parse_let(tokens: &mut TokenStream) -> Result<Expr, ParseError> {
 fn parse_if(tokens: &mut TokenStream) -> Result<Expr, ParseError> {
     tokens.eat(Token::If)?;
     let cnd = Box::new(parse_expr(tokens)?);
-    let thn = parse_block(tokens)?;
+    let thn = Box::new(parse_expr(tokens)?); // parse_block(tokens)?;
     tokens.eat(Token::Else)?;
-    let els = parse_block(tokens)?;
+    let els = Box::new(parse_expr(tokens)?); // parse_block(tokens)?;
 
     Ok(Expr::If(If { cnd, thn, els }))
 }
@@ -592,7 +602,10 @@ mod tests {
 
     #[test]
     fn parse_arith() {
-        let mut tokens = lex(r#" x + 2 * y - 3 / 4 + z"#).unwrap().into_iter().peekable();
+        let mut tokens = lex(r#" x + 2 * y - 3 / 4 + z"#)
+            .unwrap()
+            .into_iter()
+            .peekable();
         let expr = parse_expr(&mut tokens).unwrap();
         dbg!(&tokens);
         println!("{:#?}", expr);
