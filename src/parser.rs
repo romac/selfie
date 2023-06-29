@@ -231,11 +231,23 @@ fn parse_primary(tokens: &mut TokenStream) -> Result<Expr, ParseError> {
         Some(Token::Let) => parse_let(tokens),
         Some(Token::If) => parse_if(tokens),
         Some(Token::ParenOpen) => parse_unit_parens_or_tuple(tokens),
+        Some(Token::Bang | Token::Dash) => parse_unary_op(tokens),
         Some(token) => Err(ParseError::UnexpectedToken(token.clone())),
         None => Err(ParseError::UnexpectedEof),
     }?;
 
     Ok(expr)
+}
+
+fn parse_unary_op(tokens: &mut TokenStream) -> Result<Expr, ParseError> {
+    let op = eat_match!(
+        tokens,
+        Token::Bang => Op1::Not,
+        Token::Dash => Op1::Neg,
+    );
+
+    let expr = parse_primary(tokens)?;
+    Ok(Expr::UnaryOp(UnaryOp { op, expr: Box::new(expr) }))
 }
 
 fn parse_enum_init(tokens: &mut TokenStream, ty: Option<Name>) -> Result<Expr, ParseError> {

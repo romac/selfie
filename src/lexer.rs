@@ -65,6 +65,59 @@ pub fn lex(input: &str) -> Result<Vec<Token>, LexError> {
     Ok(tokens)
 }
 
+fn lex_token(input: &str) -> IResult<&str, Token> {
+    delimited(
+        multispace0,
+        lex_token_inner,
+        multispace0,
+    )(input)
+}
+
+fn lex_token_inner(input: &str) -> IResult<&str, Token> {
+    alt((
+        alt((
+            lex_fn,
+            lex_struct,
+            lex_enum,
+            lex_let,
+            lex_if,
+            lex_else,
+            lex_open_paren,
+            lex_close_paren,
+            lex_open_brace,
+            lex_close_brace,
+            lex_arrow,
+            lex_colon,
+            lex_comma,
+            lex_dot,
+        )),
+        alt((
+            lex_plus,
+            lex_dash,
+            lex_star,
+            lex_slash,
+            lex_equal_equal,
+            lex_equal,
+            lex_bang_equal,
+            lex_bang,
+            lex_greater_equal,
+            less_greater,
+            lex_less_equal,
+            lex_less,
+            lex_under,
+            lex_or,
+            lex_and,
+        )),
+        alt((
+            lex_bool,
+            lex_identifier,
+            lex_float64,
+            lex_int64,
+            // lex_string,
+        ))
+    ))(input)
+}
+
 fn lex_identifier(input: &str) -> IResult<&str, Token> {
     map(
         recognize(pair(alpha1, many0(alt((alpha1, digit1, tag("_")))))),
@@ -207,59 +260,6 @@ fn lex_or(input: &str) -> IResult<&str, Token> {
 
 fn lex_and(input: &str) -> IResult<&str, Token> {
     value(Token::And, tag("&&"))(input)
-}
-
-fn lex_token(input: &str) -> IResult<&str, Token> {
-    delimited(
-        multispace0,
-        lex_token_inner,
-        multispace0,
-    )(input)
-}
-
-fn lex_token_inner(input: &str) -> IResult<&str, Token> {
-    alt((
-        alt((
-            lex_fn,
-            lex_struct,
-            lex_enum,
-            lex_let,
-            lex_if,
-            lex_else,
-            lex_open_paren,
-            lex_close_paren,
-            lex_open_brace,
-            lex_close_brace,
-            lex_arrow,
-            lex_colon,
-            lex_comma,
-            lex_dot,
-        )),
-        alt((
-            lex_plus,
-            lex_dash,
-            lex_star,
-            lex_slash,
-            lex_equal_equal,
-            lex_equal,
-            lex_bang_equal,
-            lex_bang,
-            lex_greater_equal,
-            less_greater,
-            lex_less_equal,
-            lex_less,
-            lex_under,
-            lex_or,
-            lex_and,
-        )),
-        alt((
-            lex_bool,
-            lex_identifier,
-            lex_float64,
-            lex_int64,
-            // lex_string,
-        ))
-    ))(input)
 }
 
 #[cfg(test)]

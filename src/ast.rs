@@ -93,6 +93,12 @@ pub enum Op2 {
 }
 
 #[derive(Debug)]
+pub enum Op1 {
+    Not,
+    Neg
+}
+
+#[derive(Debug)]
 pub struct FnCall {
     pub name: Name,
     pub args: Vec<Arg>,
@@ -133,6 +139,12 @@ pub struct BinOp {
 }
 
 #[derive(Debug)]
+pub struct UnaryOp {
+    pub op: Op1,
+    pub expr: Box<Expr>,
+}
+
+#[derive(Debug)]
 pub struct StructInit {
     pub id: Name,
     pub args: Vec<NamedArg>,
@@ -168,6 +180,7 @@ pub enum Expr {
     FieldAccess(FieldAccess),
     Tuple(Tuple),
     Let(Let),
+    UnaryOp(UnaryOp),
     BinOp(BinOp),
     If(If),
     StructInit(StructInit),
