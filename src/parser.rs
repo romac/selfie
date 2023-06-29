@@ -1,29 +1,24 @@
-use core::fmt;
+use thiserror::Error;
 
 use crate::ast::*;
 use crate::lexer::{lex, Token};
 
-#[derive(Debug)]
+#[derive(Clone, Debug, Error)]
 pub enum ParseError {
+    #[error("Lex error: {0}")]
     Lex(String),
-    UnexpectedEof,
-    UnexpectedToken(Token),
-    ExpectedIdentifier,
-    ExpectedToken(Token, Token),
-}
 
-impl fmt::Display for ParseError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            ParseError::Lex(msg) => write!(f, "Lex error: {msg}"),
-            ParseError::UnexpectedEof => write!(f, "Unexpected end of file"),
-            ParseError::UnexpectedToken(token) => write!(f, "Unexpected token: {token:?}"),
-            ParseError::ExpectedIdentifier => write!(f, "Expected identifier"),
-            ParseError::ExpectedToken(expected, got) => {
-                write!(f, "Expected token {expected:?}, instead got {got:?}")
-            }
-        }
-    }
+    #[error("Unexpected end of file")]
+    UnexpectedEof,
+
+    #[error("Unexpected token {0:?}")]
+    UnexpectedToken(Token),
+
+    #[error("Expected identifier")]
+    ExpectedIdentifier,
+
+    #[error("Expected {0:?}, instead got {1:?}")]
+    ExpectedToken(Token, Token),
 }
 
 type TokenStream = std::iter::Peekable<std::vec::IntoIter<Token>>;
@@ -356,7 +351,7 @@ fn parse_field_access_or_method_call(
 fn parse_let(tokens: &mut TokenStream) -> Result<Expr, ParseError> {
     tokens.eat(Token::Let)?;
     let name = parse_name(tokens)?;
-    tokens.eat(Token::Equals)?;
+    tokens.eat(Token::Equal)?;
     let value = Box::new(parse_expr(tokens)?);
     let body = Box::new(parse_expr(tokens)?);
 

@@ -1,7 +1,5 @@
 #![allow(dead_code)]
 
-use std::fmt;
-
 use nom::{
     branch::alt,
     bytes::complete::tag,
@@ -11,6 +9,8 @@ use nom::{
     sequence::{delimited, pair, tuple},
     IResult,
 };
+
+use thiserror::Error;
 
 mod string;
 use string::parse_string;
@@ -35,26 +35,28 @@ pub enum Token {
     Colon,
     Comma,
     Dot,
-    Equals,
     Arrow,
     Under,
     Slash,
     Star,
     Dash,
     Plus,
+    Bang,
+    BangEqual,
+    Equal,
+    EqualEqual,
+    Greater,
+    GreaterEqual,
+    Less,
+    LessEqual,
+    Or,
+    And,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum LexError<'input> {
+    #[error("{0}")]
     Nom(nom::error::Error<&'input str>),
-}
-
-impl<'input> fmt::Display for LexError<'input> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            LexError::Nom(e) => write!(f, "{e}"),
-        }
-    }
 }
 
 pub fn lex(input: &str) -> Result<Vec<Token>, LexError> {
@@ -159,8 +161,36 @@ fn lex_slash(input: &str) -> IResult<&str, Token> {
     value(Token::Slash, tag("/"))(input)
 }
 
-fn lex_equals(input: &str) -> IResult<&str, Token> {
-    value(Token::Equals, tag("="))(input)
+fn lex_equal_equal(input: &str) -> IResult<&str, Token> {
+    value(Token::EqualEqual, tag("=="))(input)
+}
+
+fn lex_equal(input: &str) -> IResult<&str, Token> {
+    value(Token::Equal, tag("="))(input)
+}
+
+fn lex_bang_equal(input: &str) -> IResult<&str, Token> {
+    value(Token::BangEqual, tag("!="))(input)
+}
+
+fn lex_bang(input: &str) -> IResult<&str, Token> {
+    value(Token::Bang, tag("!"))(input)
+}
+
+fn lex_greater_equal(input: &str) -> IResult<&str, Token> {
+    value(Token::GreaterEqual, tag(">="))(input)
+}
+
+fn less_greater(input: &str) -> IResult<&str, Token> {
+    value(Token::Greater, tag(">"))(input)
+}
+
+fn lex_less_equal(input: &str) -> IResult<&str, Token> {
+    value(Token::LessEqual, tag("<="))(input)
+}
+
+fn lex_less(input: &str) -> IResult<&str, Token> {
+    value(Token::Less, tag("<"))(input)
 }
 
 fn lex_arrow(input: &str) -> IResult<&str, Token> {
@@ -171,42 +201,65 @@ fn lex_under(input: &str) -> IResult<&str, Token> {
     value(Token::Under, tag("_"))(input)
 }
 
+fn lex_or(input: &str) -> IResult<&str, Token> {
+    value(Token::Or, tag("||"))(input)
+}
+
+fn lex_and(input: &str) -> IResult<&str, Token> {
+    value(Token::And, tag("&&"))(input)
+}
+
 fn lex_token(input: &str) -> IResult<&str, Token> {
     delimited(
         multispace0,
-        alt((
-            alt((
-                lex_fn,
-                lex_struct,
-                lex_enum,
-                lex_let,
-                lex_if,
-                lex_else,
-                lex_open_paren,
-                lex_close_paren,
-                lex_open_brace,
-                lex_close_brace,
-                lex_arrow,
-            )),
-            alt((
-                lex_colon,
-                lex_comma,
-                lex_dot,
-                lex_plus,
-                lex_dash,
-                lex_star,
-                lex_slash,
-                lex_equals,
-                lex_under,
-                lex_bool,
-                lex_identifier,
-                lex_float64,
-                lex_int64,
-                // lex_string,
-            )),
-        )),
+        lex_token_inner,
         multispace0,
     )(input)
+}
+
+fn lex_token_inner(input: &str) -> IResult<&str, Token> {
+    alt((
+        alt((
+            lex_fn,
+            lex_struct,
+            lex_enum,
+            lex_let,
+            lex_if,
+            lex_else,
+            lex_open_paren,
+            lex_close_paren,
+            lex_open_brace,
+            lex_close_brace,
+            lex_arrow,
+            lex_colon,
+            lex_comma,
+            lex_dot,
+        )),
+        alt((
+            lex_plus,
+            lex_dash,
+            lex_star,
+            lex_slash,
+            lex_equal_equal,
+            lex_equal,
+            lex_bang_equal,
+            lex_bang,
+            lex_greater_equal,
+            less_greater,
+            lex_less_equal,
+            lex_less,
+            lex_under,
+            lex_or,
+            lex_and,
+        )),
+        alt((
+            lex_bool,
+            lex_identifier,
+            lex_float64,
+            lex_int64,
+            // lex_string,
+        ))
+    ))(input)
 }
 
 #[cfg(test)]
@@ -287,11 +340,11 @@ mod tests {
                 BraceOpen,
                 Let,
                 identifier("x"),
-                Equals,
+                Equal,
                 Int64(42),
                 Let,
                 identifier("y"),
-                Equals,
+                Equal,
                 Float64(69.123),
                 // Let,
                 // identifier("z"),
