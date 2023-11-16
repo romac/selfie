@@ -4,6 +4,8 @@ resolver = "2"
 members = [
   "selfie",
   "selfie-lexer",
+  "selfie-ast",
+  "selfie-parser",
 ]
 
 [workspace.package]

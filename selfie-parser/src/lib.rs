@@ -1,8 +1,7 @@
 use thiserror::Error;
 
+use selfie_ast::*;
 use selfie_lexer::{lex, Token};
-
-use crate::ast::*;
 
 #[derive(Clone, Debug, Error)]
 pub enum ParseError {
@@ -100,14 +99,14 @@ fn parse_enum_decl(tokens: &mut TokenStream) -> Result<Decl, ParseError> {
 }
 
 fn parse_name(tokens: &mut TokenStream) -> Result<Name, ParseError> {
-    eat_match!(tokens, Token::Identifier(name) => Ok(Name(name)))
+    eat_match!(tokens, Token::Identifier(name) => Ok(Name::new(name)))
 }
 
 fn parse_type(tokens: &mut TokenStream) -> Result<Type, ParseError> {
     let name = eat_match!(tokens, Token::Identifier(name) => name);
     match name.as_str() {
         "Int64" => Ok(Type::Int64),
-        other => Ok(Type::Named(Name(other.to_string()))),
+        other => Ok(Type::Named(Name::new(other))),
     }
 }
 
@@ -597,7 +596,7 @@ mod tests {
 
     #[test]
     fn parse_examples() {
-        let examples = std::fs::read_dir("examples").unwrap();
+        let examples = std::fs::read_dir("../examples").unwrap();
         for example in examples {
             let example = example.unwrap();
             let path = example.path();

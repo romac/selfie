@@ -1,7 +1,11 @@
 #[derive(Debug)]
-pub struct Name(pub(crate) String);
+pub struct Name(String);
 
 impl Name {
+    pub fn new<S: ToString>(s: S) -> Self {
+        Self(s.to_string())
+    }
+
     pub fn is_camel_case(&self) -> bool {
         self.0.chars().next().is_some_and(|c| c.is_uppercase())
     }
@@ -95,7 +99,7 @@ pub enum Op2 {
 #[derive(Debug)]
 pub enum Op1 {
     Not,
-    Neg
+    Neg,
 }
 
 #[derive(Debug)]
