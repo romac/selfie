@@ -223,7 +223,7 @@ fn parse_subfactor0(tokens: &mut TokenStream, lhs: Expr) -> Result<Expr, ParseEr
 fn parse_primary(tokens: &mut TokenStream) -> Result<Expr, ParseError> {
     let expr = match tokens.peek() {
         Some(Token::Int64(_)) => parse_int64(tokens),
-        Some(Token::Float64(_)) => parse_float64(tokens),
+        // Some(Token::Float64(_)) => parse_float64(tokens),
         Some(Token::String(_)) => parse_string(tokens),
         Some(Token::Bool(_)) => parse_bool(tokens),
         Some(Token::Identifier(_)) => parse_var_or_fn_call_or_init(tokens),
@@ -247,7 +247,10 @@ fn parse_unary_op(tokens: &mut TokenStream) -> Result<Expr, ParseError> {
     );
 
     let expr = parse_primary(tokens)?;
-    Ok(Expr::UnaryOp(UnaryOp { op, expr: Box::new(expr) }))
+    Ok(Expr::UnaryOp(UnaryOp {
+        op,
+        expr: Box::new(expr),
+    }))
 }
 
 fn parse_enum_init(tokens: &mut TokenStream, ty: Option<Name>) -> Result<Expr, ParseError> {
@@ -280,9 +283,9 @@ fn parse_int64(tokens: &mut TokenStream) -> Result<Expr, ParseError> {
     eat_match!(tokens, Token::Int64(value) => Ok(Expr::Lit(Literal::Int64(value))))
 }
 
-fn parse_float64(tokens: &mut TokenStream) -> Result<Expr, ParseError> {
-    eat_match!(tokens, Token::Float64(value) => Ok(Expr::Lit(Literal::Float64(value))))
-}
+// fn parse_float64(tokens: &mut TokenStream) -> Result<Expr, ParseError> {
+//     eat_match!(tokens, Token::Float64(value) => Ok(Expr::Lit(Literal::Float64(value))))
+// }
 
 fn parse_bool(tokens: &mut TokenStream) -> Result<Expr, ParseError> {
     eat_match!(tokens, Token::Bool(value) => Ok(Expr::Lit(Literal::Bool(value))))

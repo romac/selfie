@@ -1,270 +1,157 @@
-#![allow(dead_code)]
+use std::fmt::Debug;
+use std::str::FromStr;
 
-use nom::{
-    branch::alt,
-    bytes::complete::tag,
-    character::complete::{alpha1, digit1, multispace0},
-    combinator::{map, recognize, value},
-    multi::{many0, many1},
-    sequence::{delimited, pair, tuple},
-    IResult,
-};
+use logos::{Lexer, Logos, Span};
 
+use ordered_float::OrderedFloat;
 use thiserror::Error;
 
 mod string;
 use string::parse_string;
 
-#[derive(Clone, Debug, PartialEq)]
+fn auto<T>(lex: &mut Lexer<Token>) -> Option<T>
+where
+    T: FromStr,
+{
+    lex.slice().parse().ok()
+}
+
+fn lex_string(lex: &mut Lexer<Token>) -> Option<String> {
+    parse_string(lex.slice()).ok().map(|(_, s)| s)
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Logos)]
+#[logos(skip r"[ \t\n\f]+")]
 pub enum Token {
+    #[regex("[a-zA-Z_][a-zA-Z0-9_]*", auto)]
     Identifier(String),
+
+    #[regex("-?[0-9]+", auto)]
     Int64(i64),
-    Float64(f64),
+
+    #[regex("-?[0-9]+\\.[0-9]+", auto)]
+    Float64(OrderedFloat<f64>),
+
+    #[regex("true|false", auto)]
     Bool(bool),
+
+    #[regex("\"([^\"\\]|\\[.])*\"", lex_string)]
     String(String),
+
+    #[token("fn")]
     Fn,
+
+    #[token("struct")]
     Struct,
+
+    #[token("enum")]
     Enum,
+
+    #[token("let")]
     Let,
+
+    #[token("if")]
     If,
+
+    #[token("else")]
     Else,
+
+    #[token("(")]
     ParenOpen,
+
+    #[token(")")]
     ParenClose,
+
+    #[token("{")]
     BraceOpen,
+
+    #[token("}")]
     BraceClose,
+
+    #[token(":")]
     Colon,
+
+    #[token(",")]
     Comma,
+
+    #[token(".")]
     Dot,
+
+    #[token("->")]
     Arrow,
+
+    #[token("_")]
     Under,
+
+    #[token("/")]
     Slash,
+
+    #[token("*")]
     Star,
+
+    #[token("-")]
     Dash,
+
+    #[token("+")]
     Plus,
+
+    #[token("!")]
     Bang,
+
+    #[token("!=")]
     BangEqual,
+
+    #[token("=")]
     Equal,
+
+    #[token("==")]
     EqualEqual,
+
+    #[token(">")]
     Greater,
+
+    #[token(">=")]
     GreaterEqual,
+
+    #[token("<")]
     Less,
+
+    #[token("<=")]
     LessEqual,
+
+    #[token("||")]
     Or,
+
+    #[token("&&")]
     And,
 }
 
 #[derive(Debug, Error)]
 pub enum LexError<'input> {
-    #[error("{0}")]
-    Nom(nom::error::Error<&'input str>),
+    #[error("unexpected token: {1}")]
+    UnexpectedToken(Span, &'input str),
 }
 
 pub fn lex(input: &str) -> Result<Vec<Token>, LexError> {
-    let (remaining, tokens) = many1(lex_token)(input).unwrap(); //.finish().map_err(LexError::Nom)?;
-    assert_eq!(remaining, "");
+    let mut lexer = Token::lexer(input);
+    let mut tokens = Vec::new();
+
+    while let Some(token) = lexer.next() {
+        if let Ok(token) = token {
+            tokens.push(token);
+        } else {
+            return Err(LexError::UnexpectedToken(lexer.span(), lexer.slice()));
+        }
+    }
+
     Ok(tokens)
-}
-
-fn lex_token(input: &str) -> IResult<&str, Token> {
-    delimited(
-        multispace0,
-        lex_token_inner,
-        multispace0,
-    )(input)
-}
-
-fn lex_token_inner(input: &str) -> IResult<&str, Token> {
-    alt((
-        alt((
-            lex_fn,
-            lex_struct,
-            lex_enum,
-            lex_let,
-            lex_if,
-            lex_else,
-            lex_open_paren,
-            lex_close_paren,
-            lex_open_brace,
-            lex_close_brace,
-            lex_arrow,
-            lex_colon,
-            lex_comma,
-            lex_dot,
-        )),
-        alt((
-            lex_plus,
-            lex_dash,
-            lex_star,
-            lex_slash,
-            lex_equal_equal,
-            lex_equal,
-            lex_bang_equal,
-            lex_bang,
-            lex_greater_equal,
-            less_greater,
-            lex_less_equal,
-            lex_less,
-            lex_under,
-            lex_or,
-            lex_and,
-        )),
-        alt((
-            lex_bool,
-            lex_identifier,
-            lex_float64,
-            lex_int64,
-            // lex_string,
-        ))
-    ))(input)
-}
-
-fn lex_identifier(input: &str) -> IResult<&str, Token> {
-    map(
-        recognize(pair(alpha1, many0(alt((alpha1, digit1, tag("_")))))),
-        |s: &str| Token::Identifier(s.to_string()),
-    )(input)
-}
-
-fn lex_float64(input: &str) -> IResult<&str, Token> {
-    map(recognize(tuple((digit1, tag("."), digit1))), |s: &str| {
-        Token::Float64(s.parse().unwrap())
-    })(input)
-}
-
-fn lex_int64(input: &str) -> IResult<&str, Token> {
-    map(digit1, |s: &str| Token::Int64(s.parse().unwrap()))(input)
-}
-
-fn lex_string(input: &str) -> IResult<&str, Token> {
-    map(parse_string, Token::String)(input)
-}
-
-fn lex_bool(input: &str) -> IResult<&str, Token> {
-    alt((
-        value(Token::Bool(true), tag("true")),
-        value(Token::Bool(false), tag("false")),
-    ))(input)
-}
-
-fn lex_fn(input: &str) -> IResult<&str, Token> {
-    value(Token::Fn, tag("fn"))(input)
-}
-
-fn lex_struct(input: &str) -> IResult<&str, Token> {
-    value(Token::Struct, tag("struct"))(input)
-}
-
-fn lex_enum(input: &str) -> IResult<&str, Token> {
-    value(Token::Enum, tag("enum"))(input)
-}
-
-fn lex_let(input: &str) -> IResult<&str, Token> {
-    value(Token::Let, tag("let"))(input)
-}
-
-fn lex_if(input: &str) -> IResult<&str, Token> {
-    value(Token::If, tag("if"))(input)
-}
-
-fn lex_else(input: &str) -> IResult<&str, Token> {
-    value(Token::Else, tag("else"))(input)
-}
-
-fn lex_open_paren(input: &str) -> IResult<&str, Token> {
-    value(Token::ParenOpen, tag("("))(input)
-}
-
-fn lex_close_paren(input: &str) -> IResult<&str, Token> {
-    value(Token::ParenClose, tag(")"))(input)
-}
-
-fn lex_open_brace(input: &str) -> IResult<&str, Token> {
-    value(Token::BraceOpen, tag("{"))(input)
-}
-
-fn lex_close_brace(input: &str) -> IResult<&str, Token> {
-    value(Token::BraceClose, tag("}"))(input)
-}
-
-fn lex_colon(input: &str) -> IResult<&str, Token> {
-    value(Token::Colon, tag(":"))(input)
-}
-
-fn lex_dot(input: &str) -> IResult<&str, Token> {
-    value(Token::Dot, tag("."))(input)
-}
-
-fn lex_comma(input: &str) -> IResult<&str, Token> {
-    value(Token::Comma, tag(","))(input)
-}
-
-fn lex_plus(input: &str) -> IResult<&str, Token> {
-    value(Token::Plus, tag("+"))(input)
-}
-
-fn lex_dash(input: &str) -> IResult<&str, Token> {
-    value(Token::Dash, tag("-"))(input)
-}
-
-fn lex_star(input: &str) -> IResult<&str, Token> {
-    value(Token::Star, tag("*"))(input)
-}
-
-fn lex_slash(input: &str) -> IResult<&str, Token> {
-    value(Token::Slash, tag("/"))(input)
-}
-
-fn lex_equal_equal(input: &str) -> IResult<&str, Token> {
-    value(Token::EqualEqual, tag("=="))(input)
-}
-
-fn lex_equal(input: &str) -> IResult<&str, Token> {
-    value(Token::Equal, tag("="))(input)
-}
-
-fn lex_bang_equal(input: &str) -> IResult<&str, Token> {
-    value(Token::BangEqual, tag("!="))(input)
-}
-
-fn lex_bang(input: &str) -> IResult<&str, Token> {
-    value(Token::Bang, tag("!"))(input)
-}
-
-fn lex_greater_equal(input: &str) -> IResult<&str, Token> {
-    value(Token::GreaterEqual, tag(">="))(input)
-}
-
-fn less_greater(input: &str) -> IResult<&str, Token> {
-    value(Token::Greater, tag(">"))(input)
-}
-
-fn lex_less_equal(input: &str) -> IResult<&str, Token> {
-    value(Token::LessEqual, tag("<="))(input)
-}
-
-fn lex_less(input: &str) -> IResult<&str, Token> {
-    value(Token::Less, tag("<"))(input)
-}
-
-fn lex_arrow(input: &str) -> IResult<&str, Token> {
-    value(Token::Arrow, tag("->"))(input)
-}
-
-fn lex_under(input: &str) -> IResult<&str, Token> {
-    value(Token::Under, tag("_"))(input)
-}
-
-fn lex_or(input: &str) -> IResult<&str, Token> {
-    value(Token::Or, tag("||"))(input)
-}
-
-fn lex_and(input: &str) -> IResult<&str, Token> {
-    value(Token::And, tag("&&"))(input)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use pretty_assertions::assert_eq;
 
     fn identifier(s: &str) -> Token {
         Token::Identifier(s.to_string())
@@ -272,13 +159,13 @@ mod tests {
 
     #[test]
     fn lex_multi() {
-        let tokens = lex("42 hello_world 123.456").unwrap();
+        let tokens = lex("42 hello_world -123").unwrap();
         assert_eq!(
             tokens,
             vec![
                 Token::Int64(42),
                 identifier("hello_world"),
-                Token::Float64(123.456)
+                Token::Int64(-123)
             ]
         );
     }
@@ -290,21 +177,45 @@ mod tests {
     }
 
     #[test]
+    fn lex_string_escaped() {
+        let tokens = lex("\"foo\\nbar\"").unwrap();
+        assert_eq!(tokens, vec![Token::String("foo\nbar".to_string())]);
+
+        let tokens = lex("\"foo\\\\bar\"").unwrap();
+        assert_eq!(tokens, vec![Token::String("foo\\bar".to_string())]);
+
+        let tokens = lex("\"foo\\u{7FFF}bar\"").unwrap();
+        assert_eq!(tokens, vec![Token::String("foo翿bar".to_string())]);
+
+        let tokens = lex("\"foo翿bar\"").unwrap();
+        assert_eq!(tokens, vec![Token::String("foo翿bar".to_string())]);
+
+        let tokens = lex("\"foo\\u{1F60D}bar\"").unwrap();
+        assert_eq!(tokens, vec![Token::String("foo😍bar".to_string())]);
+
+        let tokens = lex("\"foo😍bar\"").unwrap();
+        assert_eq!(tokens, vec![Token::String("foo😍bar".to_string())]);
+
+        let tokens = lex("\"foo\\    bar\"").unwrap();
+        assert_eq!(tokens, vec![Token::String("foobar".to_string())]);
+    }
+
+    #[test]
     fn lex_float64() {
         let tokens = lex("42.69").unwrap();
-        assert_eq!(tokens, vec![Token::Float64(42.69)]);
+        assert_eq!(tokens, vec![Token::Float64(42.69f64.into())]);
+
+        let tokens = lex("-42.69").unwrap();
+        assert_eq!(tokens, vec![Token::Float64((-42.69f64).into())]);
     }
 
     #[test]
     fn lex_identifier() {
         let tokens = lex("hello_world").unwrap();
         assert_eq!(tokens, vec![identifier("hello_world")]);
-    }
 
-    #[test]
-    fn lex_string() {
-        let tokens = vec![super::lex_string(r#""Hello World""#).unwrap().1];
-        assert_eq!(tokens, vec![Token::String(String::from("Hello World"))]);
+        let tokens = lex("_helloWorld").unwrap();
+        assert_eq!(tokens, vec![identifier("_helloWorld")]);
     }
 
     #[test]
@@ -314,7 +225,8 @@ mod tests {
         let tokens = lex(r#"
             fn add(_ x: Int64, y: Int64) -> Int64 {
                 let x = 42
-                let y = 69.123
+                let y = -69
+                let z = "Hello, World!"
                 true
             }
         "#)
@@ -345,11 +257,11 @@ mod tests {
                 Let,
                 identifier("y"),
                 Equal,
-                Float64(69.123),
-                // Let,
-                // identifier("z"),
-                // Equals,
-                // String("Hello World".to_string()),
+                Int64(-69),
+                Let,
+                identifier("z"),
+                Equal,
+                String("Hello, World!".to_string()),
                 Bool(true),
                 BraceClose
             ]
