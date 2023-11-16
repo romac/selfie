@@ -1,10 +1,10 @@
 use std::path::Path;
 
 use chumsky::input::{Input, SpannedInput, Stream};
-use chumsky::primitive::just;
+use chumsky::primitive::{end, just};
 use chumsky::span::SimpleSpan;
 use chumsky::util::MaybeRef;
-use chumsky::{extra, Parser};
+use chumsky::{extra, select, IterParser, Parser};
 use thiserror::Error;
 
 use selfie_ast::*;
@@ -65,30 +65,136 @@ pub fn parse_file(path: impl AsRef<Path>) -> Result<Module, Vec<ParseError>> {
     parse_module(&contents)
 }
 
-pub fn parse_module(contents: &str) -> Result<Module, Vec<ParseError>> {
-    let tokens = lex(contents).map_err(|e| vec![ParseError::Lex(e)])?;
+fn text_to_input(
+    text: &str,
+) -> Result<ParserInput<impl Iterator<Item = Spanned<Token>>>, LexError> {
+    let tokens = lex(text)?;
     let len = tokens.len();
-
     let tokens = tokens.into_iter().map(|(t, s)| (t, s.into()));
-    let input = Stream::from_iter(tokens).spanned((len..len).into());
-    let struct_decl = parse_struct().parse(input).into_result();
+    Ok(Stream::from_iter(tokens).spanned((len..len).into()))
+}
 
-    Ok(Module {
-        decls: vec![Decl::Struct(struct_decl?)],
-    })
+pub fn parse_module(contents: &str) -> Result<Module, Vec<ParseError>> {
+    let input = text_to_input(contents).map_err(|e| vec![ParseError::Lex(e)])?;
+
+    let decls = parse_decl()
+        .repeated()
+        .collect::<Vec<_>>()
+        .then_ignore(end())
+        .parse(input)
+        .into_result()?;
+
+    Ok(Module { decls })
+}
+
+pub fn parse_identifier<'a, I>() -> impl Parser<'a, ParserInput<I>, Name, extra::Err<ParseError>>
+where
+    I: Iterator<Item = Spanned<Token>> + 'a,
+{
+    select!(Token::Identifier(id) => Name::interned(id))
+}
+
+pub fn parse_type<'a, I>() -> impl Parser<'a, ParserInput<I>, Type, extra::Err<ParseError>>
+where
+    I: Iterator<Item = Spanned<Token>> + 'a,
+{
+    fn to_type(id: Ustr) -> Type {
+        match id.as_ref() {
+            "String" => Type::String,
+            "Bool" => Type::Bool,
+            "Unit" => Type::Unit,
+            "Int64" => Type::Int64,
+            "Float64" => Type::Float64,
+            _ => Type::Named(Name::interned(id)),
+        }
+    }
+
+    select!(Token::Identifier(id) => to_type(id))
+}
+
+pub fn parse_decl<'a, I>() -> impl Parser<'a, ParserInput<I>, Decl, extra::Err<ParseError>>
+where
+    I: Iterator<Item = Spanned<Token>> + 'a,
+{
+    parse_struct()
+        .map(Decl::Struct)
+        .or(parse_enum().map(Decl::Enum))
 }
 
 pub fn parse_struct<'a, I>() -> impl Parser<'a, ParserInput<I>, StructDecl, extra::Err<ParseError>>
 where
     I: Iterator<Item = Spanned<Token>> + 'a,
 {
-    just(Token::Equal).map(|_| StructDecl {
-        name: Name::new("Hello"),
-        fields: vec![],
-    })
+    let fields = parse_field()
+        .separated_by(just(Token::Comma))
+        .allow_trailing()
+        .collect::<Vec<_>>();
+
+    just(Token::Struct)
+        .ignore_then(parse_identifier())
+        .then(braces(fields))
+        .map(|(name, fields)| StructDecl { name, fields })
+}
+
+pub fn parse_field<'a, I>() -> impl Parser<'a, ParserInput<I>, Param, extra::Err<ParseError>>
+where
+    I: Iterator<Item = Spanned<Token>> + 'a,
+{
+    parse_identifier()
+        .then_ignore(just(Token::Colon))
+        .then(parse_type())
+        .map(|(name, ty)| Param {
+            name,
+            ty,
+            anon: false,
+        })
+}
+
+pub fn parse_enum<'a, I>() -> impl Parser<'a, ParserInput<I>, EnumDecl, extra::Err<ParseError>>
+where
+    I: Iterator<Item = Spanned<Token>> + 'a,
+{
+    let variants = parse_variant()
+        .separated_by(just(Token::Comma))
+        .allow_trailing()
+        .collect::<Vec<_>>();
+
+    just(Token::Enum)
+        .ignore_then(parse_identifier())
+        .then(braces(variants))
+        .map(|(name, variants)| EnumDecl { name, variants })
+}
+
+pub fn parse_variant<'a, I>() -> impl Parser<'a, ParserInput<I>, Variant, extra::Err<ParseError>>
+where
+    I: Iterator<Item = Spanned<Token>> + 'a,
+{
+    just(Token::Dot)
+        .ignore_then(parse_identifier())
+        .then(parens(parse_type()))
+        .map(|(name, ty)| Variant { name, ty })
+}
+
+fn braces<'a, A, I>(
+    p: impl Parser<'a, ParserInput<I>, A, extra::Err<ParseError>>,
+) -> impl Parser<'a, ParserInput<I>, A, extra::Err<ParseError>>
+where
+    I: Iterator<Item = Spanned<Token>> + 'a,
+{
+    p.delimited_by(just(Token::BraceOpen), just(Token::BraceClose))
+}
+
+fn parens<'a, A, I>(
+    p: impl Parser<'a, ParserInput<I>, A, extra::Err<ParseError>>,
+) -> impl Parser<'a, ParserInput<I>, A, extra::Err<ParseError>>
+where
+    I: Iterator<Item = Spanned<Token>> + 'a,
+{
+    p.delimited_by(just(Token::ParenOpen), just(Token::ParenClose))
 }
 
 #[cfg(test)]
+#[allow(unused_variables)]
 mod tests {
     use super::*;
 
@@ -112,6 +218,50 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn parse_braces() {
+        let input = text_to_input(r#" { hello_world }"#).unwrap();
+        let expr = braces(parse_identifier()).parse(input).unwrap();
+    }
+
+    #[test]
+    fn parse_sep_by() {
+        let input = text_to_input(r#"foo, bar"#).unwrap();
+        let expr = parse_identifier()
+            .separated_by(just(Token::Comma))
+            .collect::<Vec<_>>()
+            .parse(input)
+            .unwrap();
+
+        let input = text_to_input(r#"foo, bar,"#).unwrap();
+        let expr = parse_identifier()
+            .separated_by(just(Token::Comma))
+            .allow_trailing()
+            .collect::<Vec<_>>()
+            .parse(input)
+            .unwrap();
+
+        let input = text_to_input(r#" { foo, bar, }"#).unwrap();
+        let expr = braces(
+            parse_identifier()
+                .separated_by(just(Token::Comma))
+                .allow_trailing()
+                .collect::<Vec<_>>(),
+        )
+        .parse(input)
+        .unwrap();
+
+        let input = text_to_input(r#" { foo: Int64, bar: String, }"#).unwrap();
+        let expr = braces(
+            parse_field()
+                .separated_by(just(Token::Comma))
+                .allow_trailing()
+                .collect::<Vec<_>>(),
+        )
+        .parse(input)
+        .unwrap();
     }
 
     // #[test]

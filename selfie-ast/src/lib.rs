@@ -1,5 +1,5 @@
-use ordered_float::OrderedFloat;
-use ustr::Ustr;
+pub use ordered_float::OrderedFloat;
+pub use ustr::Ustr;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Name(Ustr);

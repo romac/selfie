@@ -71,6 +71,10 @@ mod lexers {
             .map_err(|_| LexError::ParseFloat(lex.span(), Ustr::from(lex.slice())))
     }
 
+    // pub fn comment(lex: &mut Lexer<Token>) -> Option<Ustr> {
+    //     Some(Ustr::from(lex.slice().trim_start_matches(['/', ' '])))
+    // }
+
     pub fn intern(lex: &mut Lexer<Token>) -> Option<Ustr> {
         Some(Ustr::from(lex.slice()))
     }
@@ -93,6 +97,9 @@ pub enum Token {
 
     #[regex("\"([^\"\\]|\\[.])*\"", lexers::string)]
     String(Ustr),
+
+    #[regex("//[^\n]*", logos::skip)]
+    Comment,
 
     #[token("fn")]
     Fn,
@@ -192,6 +199,7 @@ impl fmt::Display for Token {
             Float64(i) => write!(f, "{i}"),
             Bool(b) => write!(f, "{b}"),
             String(s) => write!(f, "\"{s}\""),
+            Comment => Ok(()),
             Fn => write!(f, "fn"),
             Struct => write!(f, "struct"),
             Enum => write!(f, "enum"),
