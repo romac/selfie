@@ -9,38 +9,74 @@ use ustr::Ustr;
 mod util;
 use util::parse_string;
 
-fn auto<T>(lex: &mut Lexer<Token>) -> Option<T>
-where
-    T: FromStr,
-{
-    lex.slice().parse().ok()
+#[derive(Clone, Debug, Error, PartialEq, Eq, Default)]
+pub enum LexError {
+    #[error("unexpected token: {1}")]
+    UnexpectedToken(Span, Ustr),
+
+    #[error("failed to parse int")]
+    ParseInt(Span, Ustr),
+
+    #[error("failed to parse float")]
+    ParseFloat(Span, Ustr),
+
+    #[error("invalid string literal: {1}")]
+    InvalidStringLiteral(Span, Ustr),
+
+    #[default]
+    #[error("other")]
+    Other,
 }
 
-fn string(lex: &mut Lexer<Token>) -> Option<Ustr> {
-    let string = parse_string(lex.slice()).ok().map(|(_, s)| s)?;
-    Some(Ustr::from(&string))
+mod lexers {
+    use super::*;
+
+    pub fn auto<T>(lex: &mut Lexer<Token>) -> Option<T>
+    where
+        T: FromStr,
+    {
+        lex.slice().parse().ok()
+    }
+
+    pub fn string(lex: &mut Lexer<Token>) -> Result<Ustr, LexError> {
+        parse_string(lex.slice())
+            .map(|(_, s)| Ustr::from(&s))
+            .map_err(|_| LexError::InvalidStringLiteral(lex.span(), Ustr::from(lex.slice())))
+    }
+
+    pub fn int(lex: &mut Lexer<Token>) -> Result<i64, LexError> {
+        lex.slice()
+            .parse()
+            .map_err(|_| LexError::ParseInt(lex.span(), Ustr::from(lex.slice())))
+    }
+
+    pub fn float(lex: &mut Lexer<Token>) -> Result<OrderedFloat<f64>, LexError> {
+        lex.slice()
+            .parse()
+            .map_err(|_| LexError::ParseFloat(lex.span(), Ustr::from(lex.slice())))
+    }
+
+    pub fn intern(lex: &mut Lexer<Token>) -> Option<Ustr> {
+        Some(Ustr::from(lex.slice()))
+    }
 }
 
-fn intern(lex: &mut Lexer<Token>) -> Option<Ustr> {
-    Some(Ustr::from(lex.slice()))
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Logos)]
-#[logos(skip r"[ \t\n\f]+")]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Logos)]
+#[logos(skip r"[ \t\n\f]+", error = LexError)]
 pub enum Token {
-    #[regex("[a-zA-Z_][a-zA-Z0-9_]*", intern)]
+    #[regex("[a-zA-Z_][a-zA-Z0-9_]*", lexers::intern)]
     Identifier(Ustr),
 
-    #[regex("-?[0-9]+", auto)]
+    #[regex("-?[0-9]+", lexers::int)]
     Int64(i64),
 
-    #[regex("-?[0-9]+\\.[0-9]+", auto)]
+    #[regex("(-?NaN)|(-?[0-9]+\\.[0-9]+)", lexers::float)]
     Float64(OrderedFloat<f64>),
 
-    #[regex("true|false", auto)]
+    #[regex("true|false", lexers::auto)]
     Bool(bool),
 
-    #[regex("\"([^\"\\]|\\[.])*\"", string)]
+    #[regex("\"([^\"\\]|\\[.])*\"", lexers::string)]
     String(Ustr),
 
     #[token("fn")]
@@ -131,21 +167,20 @@ pub enum Token {
     And,
 }
 
-#[derive(Debug, Error)]
-pub enum LexError<'input> {
-    #[error("unexpected token: {1}")]
-    UnexpectedToken(Span, &'input str),
-}
-
 pub fn lex(input: &str) -> Result<Vec<Token>, LexError> {
     let mut lexer = Token::lexer(input);
     let mut tokens = Vec::new();
 
     while let Some(token) = lexer.next() {
-        if let Ok(token) = token {
-            tokens.push(token);
-        } else {
-            return Err(LexError::UnexpectedToken(lexer.span(), lexer.slice()));
+        match token {
+            Ok(token) => tokens.push(token),
+            Err(LexError::Other) => {
+                return Err(LexError::UnexpectedToken(
+                    lexer.span(),
+                    Ustr::from(lexer.slice()),
+                ));
+            }
+            Err(err) => return Err(err),
         }
     }
 
@@ -164,6 +199,32 @@ mod tests {
 
     fn string(s: &str) -> Token {
         Token::String(Ustr::from(s))
+    }
+
+    #[test]
+    fn lex_invalid() {
+        let tokens = lex("hello_world 42 \"foo").unwrap_err();
+        assert_eq!(
+            tokens,
+            LexError::UnexpectedToken(15..19, Ustr::from("\"foo"),)
+        );
+
+        let tokens = lex("trabad%toto");
+        assert_eq!(
+            tokens,
+            Err(LexError::UnexpectedToken(6..7, Ustr::from("%")))
+        );
+
+        let input = "\"foo\\u{}bar\"";
+        let tokens = lex(input).unwrap_err();
+        assert_eq!(
+            tokens,
+            LexError::InvalidStringLiteral(0..12, Ustr::from(input))
+        );
+
+        let input = "999999999912491943249329493294932492342347235476236426462348324673264823";
+        let tokens = lex(input).unwrap_err();
+        assert_eq!(tokens, LexError::ParseInt(0..72, Ustr::from(input)));
     }
 
     #[test]
