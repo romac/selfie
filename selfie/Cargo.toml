@@ -9,6 +9,8 @@ selfie-ast    = { path = "../selfie-ast" }
 selfie-lexer  = { path = "../selfie-lexer" }
 selfie-parser = { path = "../selfie-parser" }
 
+ariadne.workspace       = true
+chumsky.workspace       = true
 nom.workspace           = true
 ordered-float.workspace = true
 thiserror.workspace     = true

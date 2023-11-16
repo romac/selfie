@@ -7,9 +7,8 @@ edition.workspace = true
 selfie-ast    = { path = "../selfie-ast" }
 selfie-lexer  = { path = "../selfie-lexer" }
 
-nom.workspace           = true
-ordered-float.workspace = true
 thiserror.workspace     = true
+chumsky.workspace       = true
 
 [dev-dependencies]
 pretty_assertions.workspace = true

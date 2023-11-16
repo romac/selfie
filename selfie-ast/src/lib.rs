@@ -1,6 +1,7 @@
+use ordered_float::OrderedFloat;
 use ustr::Ustr;
 
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Name(Ustr);
 
 impl Name {
@@ -17,7 +18,7 @@ impl Name {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Type {
     Int64,
     Float64,
@@ -28,7 +29,7 @@ pub enum Type {
     Fn { args: Vec<Type>, ret: Box<Type> },
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Param {
     pub name: Name,
     pub ty: Type,
@@ -60,7 +61,7 @@ pub struct FnDecl {
     pub body: Vec<Expr>,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct StructDecl {
     pub name: Name,
     pub fields: Vec<Param>,
@@ -172,10 +173,10 @@ pub struct Tuple {
     pub items: Vec<Expr>,
 }
 
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Literal {
     Int64(i64),
-    Float64(f64),
+    Float64(OrderedFloat<f64>),
     Bool(bool),
     String(Ustr),
     Unit,

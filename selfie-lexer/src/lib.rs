@@ -1,13 +1,16 @@
+use core::fmt;
 use std::fmt::Debug;
 use std::str::FromStr;
 
-use logos::{Lexer, Logos, Span};
+use logos::{Lexer, Logos};
 use ordered_float::OrderedFloat;
 use thiserror::Error;
 use ustr::Ustr;
 
 mod util;
 use util::parse_string;
+
+pub use logos::Span;
 
 #[derive(Clone, Debug, Error, PartialEq, Eq, Default)]
 pub enum LexError {
@@ -26,6 +29,18 @@ pub enum LexError {
     #[default]
     #[error("other")]
     Other,
+}
+
+impl LexError {
+    pub fn span(&self) -> &Span {
+        match self {
+            Self::UnexpectedToken(span, _) => span,
+            Self::ParseInt(span, _) => span,
+            Self::ParseFloat(span, _) => span,
+            Self::InvalidStringLiteral(span, _) => span,
+            Self::Other => unreachable!(),
+        }
+    }
 }
 
 mod lexers {
@@ -167,19 +182,64 @@ pub enum Token {
     And,
 }
 
-pub fn lex(input: &str) -> Result<Vec<Token>, LexError> {
+impl fmt::Display for Token {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use Token::*;
+
+        match self {
+            Identifier(s) => write!(f, "{s}"),
+            Int64(i) => write!(f, "{i}"),
+            Float64(i) => write!(f, "{i}"),
+            Bool(b) => write!(f, "{b}"),
+            String(s) => write!(f, "\"{s}\""),
+            Fn => write!(f, "fn"),
+            Struct => write!(f, "struct"),
+            Enum => write!(f, "enum"),
+            Let => write!(f, "let"),
+            If => write!(f, "if"),
+            Else => write!(f, "else"),
+            ParenOpen => write!(f, "("),
+            ParenClose => write!(f, ")"),
+            BraceOpen => write!(f, "{{"),
+            BraceClose => write!(f, "}}"),
+            Colon => write!(f, ":"),
+            Comma => write!(f, ","),
+            Dot => write!(f, "."),
+            Arrow => write!(f, "->"),
+            Under => write!(f, "_"),
+            Slash => write!(f, "/"),
+            Star => write!(f, "*"),
+            Dash => write!(f, "-"),
+            Plus => write!(f, "+"),
+            Bang => write!(f, "!"),
+            BangEqual => write!(f, "!="),
+            Equal => write!(f, "="),
+            EqualEqual => write!(f, "=="),
+            Greater => write!(f, ">"),
+            GreaterEqual => write!(f, ">="),
+            Less => write!(f, "<"),
+            LessEqual => write!(f, "<="),
+            Or => write!(f, "||"),
+            And => write!(f, "&&"),
+        }
+    }
+}
+
+pub fn lex(input: &str) -> Result<Vec<(Token, Span)>, LexError> {
     let mut lexer = Token::lexer(input);
     let mut tokens = Vec::new();
 
     while let Some(token) = lexer.next() {
         match token {
-            Ok(token) => tokens.push(token),
+            Ok(token) => tokens.push((token, lexer.span())),
+
             Err(LexError::Other) => {
                 return Err(LexError::UnexpectedToken(
                     lexer.span(),
                     Ustr::from(lexer.slice()),
                 ));
             }
+
             Err(err) => return Err(err),
         }
     }
@@ -193,6 +253,10 @@ mod tests {
 
     use pretty_assertions::assert_eq;
 
+    fn toks(input: &str) -> Result<Vec<Token>, LexError> {
+        Ok(lex(input)?.into_iter().map(|(t, _)| t).collect::<Vec<_>>())
+    }
+
     fn identifier(s: &str) -> Token {
         Token::Identifier(Ustr::from(s))
     }
@@ -203,33 +267,33 @@ mod tests {
 
     #[test]
     fn lex_invalid() {
-        let tokens = lex("hello_world 42 \"foo").unwrap_err();
+        let tokens = toks("hello_world 42 \"foo").unwrap_err();
         assert_eq!(
             tokens,
             LexError::UnexpectedToken(15..19, Ustr::from("\"foo"),)
         );
 
-        let tokens = lex("trabad%toto");
+        let tokens = toks("trabad%toto");
         assert_eq!(
             tokens,
             Err(LexError::UnexpectedToken(6..7, Ustr::from("%")))
         );
 
         let input = "\"foo\\u{}bar\"";
-        let tokens = lex(input).unwrap_err();
+        let tokens = toks(input).unwrap_err();
         assert_eq!(
             tokens,
             LexError::InvalidStringLiteral(0..12, Ustr::from(input))
         );
 
         let input = "999999999912491943249329493294932492342347235476236426462348324673264823";
-        let tokens = lex(input).unwrap_err();
+        let tokens = toks(input).unwrap_err();
         assert_eq!(tokens, LexError::ParseInt(0..72, Ustr::from(input)));
     }
 
     #[test]
     fn lex_multi() {
-        let tokens = lex("42 hello_world -123").unwrap();
+        let tokens = toks("42 hello_world -123").unwrap();
         assert_eq!(
             tokens,
             vec![
@@ -242,49 +306,49 @@ mod tests {
 
     #[test]
     fn lex_int64() {
-        let tokens = lex("42").unwrap();
+        let tokens = toks("42").unwrap();
         assert_eq!(tokens, vec![Token::Int64(42)]);
     }
 
     #[test]
     fn lex_string_escaped() {
-        let tokens = lex("\"foo\\nbar\"").unwrap();
+        let tokens = toks("\"foo\\nbar\"").unwrap();
         assert_eq!(tokens, vec![string("foo\nbar")]);
 
-        let tokens = lex("\"foo\\\\bar\"").unwrap();
+        let tokens = toks("\"foo\\\\bar\"").unwrap();
         assert_eq!(tokens, vec![string("foo\\bar")]);
 
-        let tokens = lex("\"foo\\u{7FFF}bar\"").unwrap();
+        let tokens = toks("\"foo\\u{7FFF}bar\"").unwrap();
         assert_eq!(tokens, vec![string("foo翿bar")]);
 
-        let tokens = lex("\"foo翿bar\"").unwrap();
+        let tokens = toks("\"foo翿bar\"").unwrap();
         assert_eq!(tokens, vec![string("foo翿bar")]);
 
-        let tokens = lex("\"foo\\u{1F60D}bar\"").unwrap();
+        let tokens = toks("\"foo\\u{1F60D}bar\"").unwrap();
         assert_eq!(tokens, vec![string("foo😍bar")]);
 
-        let tokens = lex("\"foo😍bar\"").unwrap();
+        let tokens = toks("\"foo😍bar\"").unwrap();
         assert_eq!(tokens, vec![string("foo😍bar")]);
 
-        let tokens = lex("\"foo\\    bar\"").unwrap();
+        let tokens = toks("\"foo\\    bar\"").unwrap();
         assert_eq!(tokens, vec![string("foobar")]);
     }
 
     #[test]
     fn lex_float64() {
-        let tokens = lex("42.69").unwrap();
+        let tokens = toks("42.69").unwrap();
         assert_eq!(tokens, vec![Token::Float64(42.69f64.into())]);
 
-        let tokens = lex("-42.69").unwrap();
+        let tokens = toks("-42.69").unwrap();
         assert_eq!(tokens, vec![Token::Float64((-42.69f64).into())]);
     }
 
     #[test]
     fn lex_identifier() {
-        let tokens = lex("hello_world").unwrap();
+        let tokens = toks("hello_world").unwrap();
         assert_eq!(tokens, vec![identifier("hello_world")]);
 
-        let tokens = lex("_helloWorld").unwrap();
+        let tokens = toks("_helloWorld").unwrap();
         assert_eq!(tokens, vec![identifier("_helloWorld")]);
     }
 
@@ -292,14 +356,16 @@ mod tests {
     fn lex_program() {
         use Token::*;
 
-        let tokens = lex(r#"
+        let tokens = toks(
+            r#"
             fn add(_ x: Int64, y: Int64) -> Int64 {
                 let x = 42
                 let y = -69
                 let z = "Hello, World!"
                 true
             }
-        "#)
+        "#,
+        )
         .unwrap();
 
         assert_eq!(

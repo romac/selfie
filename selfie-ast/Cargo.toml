@@ -5,4 +5,5 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-ustr.workspace = true
+ordered-float.workspace = true
+ustr.workspace          = true
