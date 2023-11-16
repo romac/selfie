@@ -134,6 +134,9 @@ pub enum Token {
     #[token(":")]
     Colon,
 
+    #[token(";")]
+    Semi,
+
     #[token(",")]
     Comma,
 
@@ -211,6 +214,7 @@ impl fmt::Display for Token {
             BraceOpen => write!(f, "{{"),
             BraceClose => write!(f, "}}"),
             Colon => write!(f, ":"),
+            Semi => write!(f, ";"),
             Comma => write!(f, ","),
             Dot => write!(f, "."),
             Arrow => write!(f, "->"),

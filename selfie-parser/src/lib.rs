@@ -2,6 +2,7 @@ use std::path::Path;
 
 use chumsky::input::{Input, SpannedInput, Stream};
 use chumsky::primitive::{choice, empty, end, just};
+use chumsky::recursive::recursive;
 use chumsky::span::SimpleSpan;
 use chumsky::util::MaybeRef;
 use chumsky::{extra, select, IterParser, Parser};
@@ -87,14 +88,15 @@ pub fn parse_module(contents: &str) -> Result<Module, Vec<ParseError>> {
     Ok(Module { decls })
 }
 
-pub fn parse_identifier<'a, I>() -> impl Parser<'a, ParserInput<I>, Name, extra::Err<ParseError>>
+pub fn parse_identifier<'a, I>(
+) -> impl Parser<'a, ParserInput<I>, Name, extra::Err<ParseError>> + Clone
 where
     I: Iterator<Item = Spanned<Token>> + 'a,
 {
     select!(Token::Identifier(id) => Name::interned(id))
 }
 
-pub fn parse_type<'a, I>() -> impl Parser<'a, ParserInput<I>, Type, extra::Err<ParseError>>
+pub fn parse_type<'a, I>() -> impl Parser<'a, ParserInput<I>, Type, extra::Err<ParseError>> + Clone
 where
     I: Iterator<Item = Spanned<Token>> + 'a,
 {
@@ -112,7 +114,7 @@ where
     select!(Token::Identifier(id) => to_type(id))
 }
 
-pub fn parse_decl<'a, I>() -> impl Parser<'a, ParserInput<I>, Decl, extra::Err<ParseError>>
+pub fn parse_decl<'a, I>() -> impl Parser<'a, ParserInput<I>, Decl, extra::Err<ParseError>> + Clone
 where
     I: Iterator<Item = Spanned<Token>> + 'a,
 {
@@ -123,7 +125,8 @@ where
     ))
 }
 
-pub fn parse_struct<'a, I>() -> impl Parser<'a, ParserInput<I>, StructDecl, extra::Err<ParseError>>
+pub fn parse_struct<'a, I>(
+) -> impl Parser<'a, ParserInput<I>, StructDecl, extra::Err<ParseError>> + Clone
 where
     I: Iterator<Item = Spanned<Token>> + 'a,
 {
@@ -138,7 +141,7 @@ where
         .map(|(name, fields)| StructDecl { name, fields })
 }
 
-pub fn parse_field<'a, I>() -> impl Parser<'a, ParserInput<I>, Field, extra::Err<ParseError>>
+pub fn parse_field<'a, I>() -> impl Parser<'a, ParserInput<I>, Field, extra::Err<ParseError>> + Clone
 where
     I: Iterator<Item = Spanned<Token>> + 'a,
 {
@@ -148,7 +151,8 @@ where
         .map(|(name, ty)| Field { name, ty })
 }
 
-pub fn parse_enum<'a, I>() -> impl Parser<'a, ParserInput<I>, EnumDecl, extra::Err<ParseError>>
+pub fn parse_enum<'a, I>(
+) -> impl Parser<'a, ParserInput<I>, EnumDecl, extra::Err<ParseError>> + Clone
 where
     I: Iterator<Item = Spanned<Token>> + 'a,
 {
@@ -163,7 +167,8 @@ where
         .map(|(name, variants)| EnumDecl { name, variants })
 }
 
-pub fn parse_variant<'a, I>() -> impl Parser<'a, ParserInput<I>, Variant, extra::Err<ParseError>>
+pub fn parse_variant<'a, I>(
+) -> impl Parser<'a, ParserInput<I>, Variant, extra::Err<ParseError>> + Clone
 where
     I: Iterator<Item = Spanned<Token>> + 'a,
 {
@@ -173,7 +178,7 @@ where
         .map(|(name, ty)| Variant { name, ty })
 }
 
-fn parse_fn<'a, I>() -> impl Parser<'a, ParserInput<I>, FnDecl, extra::Err<ParseError>>
+fn parse_fn<'a, I>() -> impl Parser<'a, ParserInput<I>, FnDecl, extra::Err<ParseError>> + Clone
 where
     I: Iterator<Item = Spanned<Token>> + 'a,
 {
@@ -182,21 +187,23 @@ where
         .allow_trailing()
         .collect::<Vec<_>>();
 
+    let body = parse_expr().repeated().collect::<Vec<_>>();
+
     just(Token::Fn)
         .ignore_then(parse_identifier())
         .then(parens(params))
         .then_ignore(just(Token::Colon))
         .then(parse_type())
-        .then(braces(empty().to(Expr::Lit(Literal::Unit))))
+        .then(braces(body))
         .map(|(((name, params), return_type), body)| FnDecl {
             name,
             params,
             return_type,
-            body: vec![body],
+            body,
         })
 }
 
-pub fn parse_param<'a, I>() -> impl Parser<'a, ParserInput<I>, Param, extra::Err<ParseError>>
+pub fn parse_param<'a, I>() -> impl Parser<'a, ParserInput<I>, Param, extra::Err<ParseError>> + Clone
 where
     I: Iterator<Item = Spanned<Token>> + 'a,
 {
@@ -207,7 +214,7 @@ where
 }
 
 pub fn parse_param_kind<'a, I>(
-) -> impl Parser<'a, ParserInput<I>, (ParamKind, Name), extra::Err<ParseError>>
+) -> impl Parser<'a, ParserInput<I>, (ParamKind, Name), extra::Err<ParseError>> + Clone
 where
     I: Iterator<Item = Spanned<Token>> + 'a,
 {
@@ -227,9 +234,59 @@ where
     choice((anon, alias, normal))
 }
 
+pub fn parse_expr<'a, I>() -> impl Parser<'a, ParserInput<I>, Expr, extra::Err<ParseError>> + Clone
+where
+    I: Iterator<Item = Spanned<Token>> + 'a,
+{
+    recursive(|expr| {
+        choice((
+            parse_lit().map(Expr::Lit),
+            parse_identifier().map(Expr::Var),
+            parse_let(expr).map(Expr::Let),
+        ))
+    })
+}
+
+pub fn parse_lit<'a, I>() -> impl Parser<'a, ParserInput<I>, Literal, extra::Err<ParseError>> + Clone
+where
+    I: Iterator<Item = Spanned<Token>> + 'a,
+{
+    let other = select! {
+        Token::String(s) => Literal::String(s),
+        Token::Float64(f) => Literal::Float64(f),
+        Token::Int64(i) => Literal::Int64(i),
+        Token::Bool(b) => Literal::Bool(b),
+    };
+
+    let unit = just(Token::ParenOpen)
+        .then(just(Token::ParenClose))
+        .to(Literal::Unit);
+
+    choice((other, unit))
+}
+
+pub fn parse_let<'a, I>(
+    expr: impl Parser<'a, ParserInput<I>, Expr, extra::Err<ParseError>> + Clone,
+) -> impl Parser<'a, ParserInput<I>, Let, extra::Err<ParseError>> + Clone
+where
+    I: Iterator<Item = Spanned<Token>> + 'a,
+{
+    just(Token::Let)
+        .ignore_then(parse_identifier())
+        .then_ignore(just(Token::Equal))
+        .then(expr.clone())
+        .then_ignore(just(Token::Semi))
+        .then(expr.clone())
+        .map(|((name, value), body)| Let {
+            name,
+            value: Box::new(value),
+            body: Box::new(body),
+        })
+}
+
 fn braces<'a, A, I>(
-    p: impl Parser<'a, ParserInput<I>, A, extra::Err<ParseError>>,
-) -> impl Parser<'a, ParserInput<I>, A, extra::Err<ParseError>>
+    p: impl Parser<'a, ParserInput<I>, A, extra::Err<ParseError>> + Clone,
+) -> impl Parser<'a, ParserInput<I>, A, extra::Err<ParseError>> + Clone
 where
     I: Iterator<Item = Spanned<Token>> + 'a,
 {
@@ -237,8 +294,8 @@ where
 }
 
 fn parens<'a, A, I>(
-    p: impl Parser<'a, ParserInput<I>, A, extra::Err<ParseError>>,
-) -> impl Parser<'a, ParserInput<I>, A, extra::Err<ParseError>>
+    p: impl Parser<'a, ParserInput<I>, A, extra::Err<ParseError>> + Clone,
+) -> impl Parser<'a, ParserInput<I>, A, extra::Err<ParseError>> + Clone
 where
     I: Iterator<Item = Spanned<Token>> + 'a,
 {
