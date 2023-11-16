@@ -3,5 +3,4 @@ TODO:
 - Replace FieldAccess, FnCall, MethodCall, EnumInit and StructInit with a single Call and Select variant
   - Disambiguate after typing
 - Replace sub-expressions, etc. with ids
-- Intern Name
 

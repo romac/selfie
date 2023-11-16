@@ -1,9 +1,15 @@
+use ustr::Ustr;
+
 #[derive(Debug)]
-pub struct Name(String);
+pub struct Name(Ustr);
 
 impl Name {
-    pub fn new<S: ToString>(s: S) -> Self {
-        Self(s.to_string())
+    pub fn new(s: &str) -> Self {
+        Self::interned(Ustr::from(s))
+    }
+
+    pub fn interned(u: Ustr) -> Self {
+        Self(u)
     }
 
     pub fn is_camel_case(&self) -> bool {
@@ -171,7 +177,7 @@ pub enum Literal {
     Int64(i64),
     Float64(f64),
     Bool(bool),
-    String(String),
+    String(Ustr),
     Unit,
 }
 

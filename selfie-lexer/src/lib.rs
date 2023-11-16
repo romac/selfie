@@ -2,9 +2,9 @@ use std::fmt::Debug;
 use std::str::FromStr;
 
 use logos::{Lexer, Logos, Span};
-
 use ordered_float::OrderedFloat;
 use thiserror::Error;
+use ustr::Ustr;
 
 mod util;
 use util::parse_string;
@@ -16,15 +16,20 @@ where
     lex.slice().parse().ok()
 }
 
-fn lex_string(lex: &mut Lexer<Token>) -> Option<String> {
-    parse_string(lex.slice()).ok().map(|(_, s)| s)
+fn string(lex: &mut Lexer<Token>) -> Option<Ustr> {
+    let string = parse_string(lex.slice()).ok().map(|(_, s)| s)?;
+    Some(Ustr::from(&string))
+}
+
+fn intern(lex: &mut Lexer<Token>) -> Option<Ustr> {
+    Some(Ustr::from(lex.slice()))
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Logos)]
 #[logos(skip r"[ \t\n\f]+")]
 pub enum Token {
-    #[regex("[a-zA-Z_][a-zA-Z0-9_]*", auto)]
-    Identifier(String),
+    #[regex("[a-zA-Z_][a-zA-Z0-9_]*", intern)]
+    Identifier(Ustr),
 
     #[regex("-?[0-9]+", auto)]
     Int64(i64),
@@ -35,8 +40,8 @@ pub enum Token {
     #[regex("true|false", auto)]
     Bool(bool),
 
-    #[regex("\"([^\"\\]|\\[.])*\"", lex_string)]
-    String(String),
+    #[regex("\"([^\"\\]|\\[.])*\"", string)]
+    String(Ustr),
 
     #[token("fn")]
     Fn,
@@ -154,7 +159,11 @@ mod tests {
     use pretty_assertions::assert_eq;
 
     fn identifier(s: &str) -> Token {
-        Token::Identifier(s.to_string())
+        Token::Identifier(Ustr::from(s))
+    }
+
+    fn string(s: &str) -> Token {
+        Token::String(Ustr::from(s))
     }
 
     #[test]
@@ -179,25 +188,25 @@ mod tests {
     #[test]
     fn lex_string_escaped() {
         let tokens = lex("\"foo\\nbar\"").unwrap();
-        assert_eq!(tokens, vec![Token::String("foo\nbar".to_string())]);
+        assert_eq!(tokens, vec![string("foo\nbar")]);
 
         let tokens = lex("\"foo\\\\bar\"").unwrap();
-        assert_eq!(tokens, vec![Token::String("foo\\bar".to_string())]);
+        assert_eq!(tokens, vec![string("foo\\bar")]);
 
         let tokens = lex("\"foo\\u{7FFF}bar\"").unwrap();
-        assert_eq!(tokens, vec![Token::String("foo翿bar".to_string())]);
+        assert_eq!(tokens, vec![string("foo翿bar")]);
 
         let tokens = lex("\"foo翿bar\"").unwrap();
-        assert_eq!(tokens, vec![Token::String("foo翿bar".to_string())]);
+        assert_eq!(tokens, vec![string("foo翿bar")]);
 
         let tokens = lex("\"foo\\u{1F60D}bar\"").unwrap();
-        assert_eq!(tokens, vec![Token::String("foo😍bar".to_string())]);
+        assert_eq!(tokens, vec![string("foo😍bar")]);
 
         let tokens = lex("\"foo😍bar\"").unwrap();
-        assert_eq!(tokens, vec![Token::String("foo😍bar".to_string())]);
+        assert_eq!(tokens, vec![string("foo😍bar")]);
 
         let tokens = lex("\"foo\\    bar\"").unwrap();
-        assert_eq!(tokens, vec![Token::String("foobar".to_string())]);
+        assert_eq!(tokens, vec![string("foobar")]);
     }
 
     #[test]
@@ -261,7 +270,7 @@ mod tests {
                 Let,
                 identifier("z"),
                 Equal,
-                String("Hello, World!".to_string()),
+                string("Hello, World!"),
                 Bool(true),
                 BraceClose
             ]

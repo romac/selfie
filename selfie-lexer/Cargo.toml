@@ -9,6 +9,7 @@ logos.workspace         = true
 nom.workspace           = true
 ordered-float.workspace = true
 thiserror.workspace     = true
+ustr.workspace          = true
 
 [dev-dependencies]
 pretty_assertions.workspace = true

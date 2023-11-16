@@ -99,7 +99,7 @@ fn parse_enum_decl(tokens: &mut TokenStream) -> Result<Decl, ParseError> {
 }
 
 fn parse_name(tokens: &mut TokenStream) -> Result<Name, ParseError> {
-    eat_match!(tokens, Token::Identifier(name) => Ok(Name::new(name)))
+    eat_match!(tokens, Token::Identifier(name) => Ok(Name::interned(name)))
 }
 
 fn parse_type(tokens: &mut TokenStream) -> Result<Type, ParseError> {
