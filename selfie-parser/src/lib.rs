@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use chumsky::input::{Input, SpannedInput, Stream};
-use chumsky::primitive::{end, just};
+use chumsky::primitive::{choice, empty, end, just};
 use chumsky::span::SimpleSpan;
 use chumsky::util::MaybeRef;
 use chumsky::{extra, select, IterParser, Parser};
@@ -116,9 +116,11 @@ pub fn parse_decl<'a, I>() -> impl Parser<'a, ParserInput<I>, Decl, extra::Err<P
 where
     I: Iterator<Item = Spanned<Token>> + 'a,
 {
-    parse_struct()
-        .map(Decl::Struct)
-        .or(parse_enum().map(Decl::Enum))
+    choice((
+        parse_fn().map(Decl::Fn),
+        parse_struct().map(Decl::Struct),
+        parse_enum().map(Decl::Enum),
+    ))
 }
 
 pub fn parse_struct<'a, I>() -> impl Parser<'a, ParserInput<I>, StructDecl, extra::Err<ParseError>>
@@ -136,18 +138,14 @@ where
         .map(|(name, fields)| StructDecl { name, fields })
 }
 
-pub fn parse_field<'a, I>() -> impl Parser<'a, ParserInput<I>, Param, extra::Err<ParseError>>
+pub fn parse_field<'a, I>() -> impl Parser<'a, ParserInput<I>, Field, extra::Err<ParseError>>
 where
     I: Iterator<Item = Spanned<Token>> + 'a,
 {
     parse_identifier()
         .then_ignore(just(Token::Colon))
         .then(parse_type())
-        .map(|(name, ty)| Param {
-            name,
-            ty,
-            anon: false,
-        })
+        .map(|(name, ty)| Field { name, ty })
 }
 
 pub fn parse_enum<'a, I>() -> impl Parser<'a, ParserInput<I>, EnumDecl, extra::Err<ParseError>>
@@ -173,6 +171,60 @@ where
         .ignore_then(parse_identifier())
         .then(parens(parse_type()))
         .map(|(name, ty)| Variant { name, ty })
+}
+
+fn parse_fn<'a, I>() -> impl Parser<'a, ParserInput<I>, FnDecl, extra::Err<ParseError>>
+where
+    I: Iterator<Item = Spanned<Token>> + 'a,
+{
+    let params = parse_param()
+        .separated_by(just(Token::Comma))
+        .allow_trailing()
+        .collect::<Vec<_>>();
+
+    just(Token::Fn)
+        .ignore_then(parse_identifier())
+        .then(parens(params))
+        .then_ignore(just(Token::Colon))
+        .then(parse_type())
+        .then(braces(empty().to(Expr::Lit(Literal::Unit))))
+        .map(|(((name, params), return_type), body)| FnDecl {
+            name,
+            params,
+            return_type,
+            body: vec![body],
+        })
+}
+
+pub fn parse_param<'a, I>() -> impl Parser<'a, ParserInput<I>, Param, extra::Err<ParseError>>
+where
+    I: Iterator<Item = Spanned<Token>> + 'a,
+{
+    parse_param_kind()
+        .then_ignore(just(Token::Colon))
+        .then(parse_type())
+        .map(|((kind, name), ty)| Param { name, ty, kind })
+}
+
+pub fn parse_param_kind<'a, I>(
+) -> impl Parser<'a, ParserInput<I>, (ParamKind, Name), extra::Err<ParseError>>
+where
+    I: Iterator<Item = Spanned<Token>> + 'a,
+{
+    // _ foo: Int
+    let anon = just(Token::Under)
+        .ignore_then(parse_identifier())
+        .map(|name| (ParamKind::Anon, name));
+
+    // bar foo: Int
+    let alias = parse_identifier()
+        .map(ParamKind::Alias)
+        .then(parse_identifier());
+
+    // foo: Int
+    let normal = parse_identifier().map(|name| (ParamKind::Normal, name));
+
+    choice((anon, alias, normal))
 }
 
 fn braces<'a, A, I>(
