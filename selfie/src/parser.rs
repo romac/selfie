@@ -1,7 +1,8 @@
 use thiserror::Error;
 
+use selfie_lexer::{lex, Token};
+
 use crate::ast::*;
-use crate::lexer::{lex, Token};
 
 #[derive(Clone, Debug, Error)]
 pub enum ParseError {

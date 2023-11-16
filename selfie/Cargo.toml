@@ -1,0 +1,15 @@
+[package]
+name = "selfie"
+
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+selfie-lexer = { path = "../selfie-lexer" }
+
+nom.workspace           = true
+ordered-float.workspace = true
+thiserror.workspace     = true
+
+[dev-dependencies]
+pretty_assertions.workspace = true

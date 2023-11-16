@@ -1,0 +1,14 @@
+[package]
+name = "selfie-lexer"
+
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+logos.workspace         = true
+nom.workspace           = true
+ordered-float.workspace = true
+thiserror.workspace     = true
+
+[dev-dependencies]
+pretty_assertions.workspace = true

@@ -6,8 +6,8 @@ use logos::{Lexer, Logos, Span};
 use ordered_float::OrderedFloat;
 use thiserror::Error;
 
-mod string;
-use string::parse_string;
+mod util;
+use util::parse_string;
 
 fn auto<T>(lex: &mut Lexer<Token>) -> Option<T>
 where
