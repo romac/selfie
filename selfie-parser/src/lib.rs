@@ -1,11 +1,13 @@
+#![feature(trait_alias)]
+
 use std::path::Path;
 
 use chumsky::input::{Input, SpannedInput, Stream};
-use chumsky::primitive::{choice, empty, end, just};
+use chumsky::primitive::{choice, end, just};
 use chumsky::recursive::recursive;
 use chumsky::span::SimpleSpan;
 use chumsky::util::MaybeRef;
-use chumsky::{extra, select, IterParser, Parser};
+use chumsky::{extra, select, IterParser};
 use thiserror::Error;
 
 use selfie_ast::*;
@@ -24,11 +26,8 @@ pub enum ParseError {
     },
 }
 
-impl<'a, I> chumsky::error::Error<'a, ParserInput<I>> for ParseError
-where
-    I: Iterator<Item = Spanned<Token>> + 'a,
-{
-    fn expected_found<Iter>(expected: Iter, found: Option<MaybeRef<'a, Token>>, span: Span) -> Self
+impl<'a> chumsky::error::Error<'a, ParserInput> for ParseError {
+    fn expected_found<Iter>(expected: Iter, found: Option<MaybeRef<Token>>, span: Span) -> Self
     where
         Iter: IntoIterator<Item = Option<MaybeRef<'a, Token>>>,
     {
@@ -59,19 +58,17 @@ where
 
 pub type Span = SimpleSpan<usize>;
 pub type Spanned<T> = (T, Span);
-pub type ParserInput<I> = SpannedInput<Token, Span, Stream<I>>;
+pub type ParserInput = SpannedInput<Token, Span, Stream<std::vec::IntoIter<(Token, Span)>>>;
 
 pub fn parse_file(path: impl AsRef<Path>) -> Result<Module, Vec<ParseError>> {
     let contents = std::fs::read_to_string(path).unwrap();
     parse_module(&contents)
 }
 
-fn text_to_input(
-    text: &str,
-) -> Result<ParserInput<impl Iterator<Item = Spanned<Token>>>, LexError> {
+fn text_to_input(text: &str) -> Result<ParserInput, LexError> {
     let tokens = lex(text)?;
     let len = tokens.len();
-    let tokens = tokens.into_iter().map(|(t, s)| (t, s.into()));
+    let tokens: Vec<_> = tokens.into_iter().map(|(t, s)| (t, s.into())).collect();
     Ok(Stream::from_iter(tokens).spanned((len..len).into()))
 }
 
@@ -88,18 +85,13 @@ pub fn parse_module(contents: &str) -> Result<Module, Vec<ParseError>> {
     Ok(Module { decls })
 }
 
-pub fn parse_identifier<'a, I>(
-) -> impl Parser<'a, ParserInput<I>, Name, extra::Err<ParseError>> + Clone
-where
-    I: Iterator<Item = Spanned<Token>> + 'a,
-{
+pub trait Parser<A> = chumsky::Parser<'static, ParserInput, A, extra::Err<ParseError>> + Clone;
+
+pub fn parse_identifier() -> impl Parser<Name> {
     select!(Token::Identifier(id) => Name::interned(id))
 }
 
-pub fn parse_type<'a, I>() -> impl Parser<'a, ParserInput<I>, Type, extra::Err<ParseError>> + Clone
-where
-    I: Iterator<Item = Spanned<Token>> + 'a,
-{
+pub fn parse_type() -> impl Parser<Type> {
     fn to_type(id: Ustr) -> Type {
         match id.as_ref() {
             "String" => Type::String,
@@ -114,10 +106,7 @@ where
     select!(Token::Identifier(id) => to_type(id))
 }
 
-pub fn parse_decl<'a, I>() -> impl Parser<'a, ParserInput<I>, Decl, extra::Err<ParseError>> + Clone
-where
-    I: Iterator<Item = Spanned<Token>> + 'a,
-{
+pub fn parse_decl() -> impl Parser<Decl> {
     choice((
         parse_fn().map(Decl::Fn),
         parse_struct().map(Decl::Struct),
@@ -125,11 +114,7 @@ where
     ))
 }
 
-pub fn parse_struct<'a, I>(
-) -> impl Parser<'a, ParserInput<I>, StructDecl, extra::Err<ParseError>> + Clone
-where
-    I: Iterator<Item = Spanned<Token>> + 'a,
-{
+pub fn parse_struct() -> impl Parser<StructDecl> {
     let fields = parse_field()
         .separated_by(just(Token::Comma))
         .allow_trailing()
@@ -141,21 +126,14 @@ where
         .map(|(name, fields)| StructDecl { name, fields })
 }
 
-pub fn parse_field<'a, I>() -> impl Parser<'a, ParserInput<I>, Field, extra::Err<ParseError>> + Clone
-where
-    I: Iterator<Item = Spanned<Token>> + 'a,
-{
+pub fn parse_field() -> impl Parser<Field> {
     parse_identifier()
         .then_ignore(just(Token::Colon))
         .then(parse_type())
         .map(|(name, ty)| Field { name, ty })
 }
 
-pub fn parse_enum<'a, I>(
-) -> impl Parser<'a, ParserInput<I>, EnumDecl, extra::Err<ParseError>> + Clone
-where
-    I: Iterator<Item = Spanned<Token>> + 'a,
-{
+pub fn parse_enum() -> impl Parser<EnumDecl> {
     let variants = parse_variant()
         .separated_by(just(Token::Comma))
         .allow_trailing()
@@ -167,21 +145,14 @@ where
         .map(|(name, variants)| EnumDecl { name, variants })
 }
 
-pub fn parse_variant<'a, I>(
-) -> impl Parser<'a, ParserInput<I>, Variant, extra::Err<ParseError>> + Clone
-where
-    I: Iterator<Item = Spanned<Token>> + 'a,
-{
+pub fn parse_variant() -> impl Parser<Variant> {
     just(Token::Dot)
         .ignore_then(parse_identifier())
         .then(parens(parse_type()))
         .map(|(name, ty)| Variant { name, ty })
 }
 
-fn parse_fn<'a, I>() -> impl Parser<'a, ParserInput<I>, FnDecl, extra::Err<ParseError>> + Clone
-where
-    I: Iterator<Item = Spanned<Token>> + 'a,
-{
+fn parse_fn() -> impl Parser<FnDecl> {
     let params = parse_param()
         .separated_by(just(Token::Comma))
         .allow_trailing()
@@ -203,21 +174,14 @@ where
         })
 }
 
-pub fn parse_param<'a, I>() -> impl Parser<'a, ParserInput<I>, Param, extra::Err<ParseError>> + Clone
-where
-    I: Iterator<Item = Spanned<Token>> + 'a,
-{
+pub fn parse_param() -> impl Parser<Param> {
     parse_param_kind()
         .then_ignore(just(Token::Colon))
         .then(parse_type())
         .map(|((kind, name), ty)| Param { name, ty, kind })
 }
 
-pub fn parse_param_kind<'a, I>(
-) -> impl Parser<'a, ParserInput<I>, (ParamKind, Name), extra::Err<ParseError>> + Clone
-where
-    I: Iterator<Item = Spanned<Token>> + 'a,
-{
+pub fn parse_param_kind() -> impl Parser<(ParamKind, Name)> {
     // _ foo: Int
     let anon = just(Token::Under)
         .ignore_then(parse_identifier())
@@ -234,10 +198,7 @@ where
     choice((anon, alias, normal))
 }
 
-pub fn parse_expr<'a, I>() -> impl Parser<'a, ParserInput<I>, Expr, extra::Err<ParseError>> + Clone
-where
-    I: Iterator<Item = Spanned<Token>> + 'a,
-{
+pub fn parse_expr() -> impl Parser<Expr> {
     recursive(|expr| {
         choice((
             parse_lit().map(Expr::Lit),
@@ -247,10 +208,7 @@ where
     })
 }
 
-pub fn parse_lit<'a, I>() -> impl Parser<'a, ParserInput<I>, Literal, extra::Err<ParseError>> + Clone
-where
-    I: Iterator<Item = Spanned<Token>> + 'a,
-{
+pub fn parse_lit() -> impl Parser<Literal> {
     let other = select! {
         Token::String(s) => Literal::String(s),
         Token::Float64(f) => Literal::Float64(f),
@@ -265,12 +223,7 @@ where
     choice((other, unit))
 }
 
-pub fn parse_let<'a, I>(
-    expr: impl Parser<'a, ParserInput<I>, Expr, extra::Err<ParseError>> + Clone,
-) -> impl Parser<'a, ParserInput<I>, Let, extra::Err<ParseError>> + Clone
-where
-    I: Iterator<Item = Spanned<Token>> + 'a,
-{
+pub fn parse_let(expr: impl Parser<Expr>) -> impl Parser<Let> {
     just(Token::Let)
         .ignore_then(parse_identifier())
         .then_ignore(just(Token::Equal))
@@ -284,21 +237,15 @@ where
         })
 }
 
-fn braces<'a, A, I>(
-    p: impl Parser<'a, ParserInput<I>, A, extra::Err<ParseError>> + Clone,
-) -> impl Parser<'a, ParserInput<I>, A, extra::Err<ParseError>> + Clone
-where
-    I: Iterator<Item = Spanned<Token>> + 'a,
-{
+pub fn parse_enum_init(_expr: impl Parser<EnumInit>) -> impl Parser<Let> {
+    chumsky::primitive::todo()
+}
+
+fn braces<A>(p: impl Parser<A>) -> impl Parser<A> {
     p.delimited_by(just(Token::BraceOpen), just(Token::BraceClose))
 }
 
-fn parens<'a, A, I>(
-    p: impl Parser<'a, ParserInput<I>, A, extra::Err<ParseError>> + Clone,
-) -> impl Parser<'a, ParserInput<I>, A, extra::Err<ParseError>> + Clone
-where
-    I: Iterator<Item = Spanned<Token>> + 'a,
-{
+fn parens<A>(p: impl Parser<A>) -> impl Parser<A> {
     p.delimited_by(just(Token::ParenOpen), just(Token::ParenClose))
 }
 
