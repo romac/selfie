@@ -49,6 +49,14 @@ pub fn parse_identifier() -> impl Parser<Name> {
     select!(Token::Identifier(id) => Name::interned(id))
 }
 
+pub fn parse_upper() -> impl Parser<Name> {
+    parse_identifier().filter(|id| id.as_str().starts_with(char::is_uppercase))
+}
+
+pub fn parse_lower() -> impl Parser<Name> {
+    parse_identifier().filter(|id| id.as_str().starts_with(char::is_lowercase))
+}
+
 pub fn parse_type() -> impl Parser<Type> {
     fn to_type(id: Name) -> Type {
         match id.as_str() {
@@ -68,9 +76,7 @@ pub fn parse_type() -> impl Parser<Type> {
             .allow_trailing()
             .collect::<Vec<_>>();
 
-        let named = parse_identifier().filter(|id| id.as_str().starts_with(char::is_uppercase));
-
-        choice((parens(tys).map(Type::Tuple), named.map(to_type)))
+        choice((parens(tys).map(Type::Tuple), parse_upper().map(to_type)))
     })
 }
 
@@ -86,13 +92,13 @@ pub fn parse_struct() -> impl Parser<StructDecl> {
     let fields = parse_field().repeated().collect::<Vec<_>>();
 
     just(Token::Struct)
-        .ignore_then(parse_identifier())
+        .ignore_then(parse_upper())
         .then(braces(fields))
         .map(|(name, fields)| StructDecl { name, fields })
 }
 
 pub fn parse_field() -> impl Parser<Field> {
-    parse_identifier()
+    parse_lower()
         .then_ignore(just(Token::Colon))
         .then(parse_type())
         .map(|(name, ty)| Field { name, ty })
@@ -102,14 +108,14 @@ pub fn parse_enum() -> impl Parser<EnumDecl> {
     let variants = parse_variant().repeated().collect::<Vec<_>>();
 
     just(Token::Enum)
-        .ignore_then(parse_identifier())
+        .ignore_then(parse_upper())
         .then(braces(variants))
         .map(|(name, variants)| EnumDecl { name, variants })
 }
 
 pub fn parse_variant() -> impl Parser<Variant> {
     just(Token::Dot)
-        .ignore_then(parse_identifier())
+        .ignore_then(parse_lower())
         .then(parens(parse_type()).or_not())
         .map(|(name, ty)| Variant { name, ty })
 }
@@ -121,7 +127,7 @@ fn parse_fn() -> impl Parser<FnDecl> {
         .collect::<Vec<_>>();
 
     just(Token::Fn)
-        .ignore_then(parse_identifier())
+        .ignore_then(parse_lower())
         .then(parens(params))
         .then_ignore(just(Token::Colon))
         .then(parse_type())
@@ -144,16 +150,14 @@ pub fn parse_param() -> impl Parser<Param> {
 pub fn parse_param_kind() -> impl Parser<(ParamKind, Name)> {
     // _ foo: Int
     let anon = just(Token::Under)
-        .ignore_then(parse_identifier())
+        .ignore_then(parse_lower())
         .map(|name| (ParamKind::Anon, name));
 
     // bar foo: Int
-    let alias = parse_identifier()
-        .map(ParamKind::Alias)
-        .then(parse_identifier());
+    let alias = parse_lower().map(ParamKind::Alias).then(parse_lower());
 
     // foo: Int
-    let normal = parse_identifier().map(|name| (ParamKind::Normal, name));
+    let normal = parse_lower().map(|name| (ParamKind::Normal, name));
 
     choice((anon, alias, normal))
 }
@@ -162,6 +166,7 @@ pub fn parse_expr() -> impl Parser<Expr> {
     recursive(|expr| {
         choice((
             parse_lit().map(Expr::Lit),
+            parse_fn_call(expr.clone()).map(Expr::FnCall),
             parse_struct_init(expr.clone()).map(Expr::StructInit),
             parse_enum_init(expr.clone()).map(Expr::EnumInit),
             parse_let(expr.clone()).map(Expr::Let),
@@ -184,6 +189,12 @@ pub fn parse_lit() -> impl Parser<Literal> {
         .to(Literal::Unit);
 
     choice((other, unit))
+}
+
+pub fn parse_fn_call(expr: impl Parser<Expr>) -> impl Parser<FnCall> {
+    parse_lower()
+        .then(parens(parse_args(expr)))
+        .map(|(name, args)| FnCall { name, args })
 }
 
 pub fn parse_let(expr: impl Parser<Expr>) -> impl Parser<Let> {
