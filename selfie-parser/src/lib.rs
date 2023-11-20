@@ -73,10 +73,7 @@ pub fn parse_decl() -> impl Parser<Decl> {
 }
 
 pub fn parse_struct() -> impl Parser<StructDecl> {
-    let fields = parse_field()
-        .separated_by(just(Token::Comma))
-        .allow_trailing()
-        .collect::<Vec<_>>();
+    let fields = parse_field().repeated().collect::<Vec<_>>();
 
     just(Token::Struct)
         .ignore_then(parse_identifier())
@@ -92,10 +89,7 @@ pub fn parse_field() -> impl Parser<Field> {
 }
 
 pub fn parse_enum() -> impl Parser<EnumDecl> {
-    let variants = parse_variant()
-        .separated_by(just(Token::Comma))
-        .allow_trailing()
-        .collect::<Vec<_>>();
+    let variants = parse_variant().repeated().collect::<Vec<_>>();
 
     just(Token::Enum)
         .ignore_then(parse_identifier())
@@ -106,7 +100,7 @@ pub fn parse_enum() -> impl Parser<EnumDecl> {
 pub fn parse_variant() -> impl Parser<Variant> {
     just(Token::Dot)
         .ignore_then(parse_identifier())
-        .then(parens(parse_type()))
+        .then(parens(parse_type()).or_not())
         .map(|(name, ty)| Variant { name, ty })
 }
 
@@ -185,7 +179,6 @@ pub fn parse_let(expr: impl Parser<Expr>) -> impl Parser<Let> {
         .ignore_then(parse_identifier())
         .then_ignore(just(Token::Equal))
         .then(expr.clone())
-        .then_ignore(just(Token::Semi))
         .then(expr.clone())
         .map(|((name, value), body)| Let {
             name,

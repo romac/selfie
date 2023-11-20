@@ -97,7 +97,7 @@ pub struct EnumDecl {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Variant {
     pub name: Name,
-    pub ty: Type,
+    pub ty: Option<Type>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
