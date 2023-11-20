@@ -50,18 +50,28 @@ pub fn parse_identifier() -> impl Parser<Name> {
 }
 
 pub fn parse_type() -> impl Parser<Type> {
-    fn to_type(id: Ustr) -> Type {
-        match id.as_ref() {
+    fn to_type(id: Name) -> Type {
+        match id.as_str() {
             "String" => Type::String,
             "Bool" => Type::Bool,
             "Unit" => Type::Unit,
             "Int64" => Type::Int64,
             "Float64" => Type::Float64,
-            _ => Type::Named(Name::interned(id)),
+            _ => Type::Named(id),
         }
     }
 
-    select!(Token::Identifier(id) => to_type(id))
+    recursive(|ty| {
+        let tys = ty
+            .separated_by(just(Token::Comma))
+            .at_least(1)
+            .allow_trailing()
+            .collect::<Vec<_>>();
+
+        let named = parse_identifier().filter(|id| id.as_str().starts_with(char::is_uppercase));
+
+        choice((parens(tys).map(Type::Tuple), named.map(to_type)))
+    })
 }
 
 pub fn parse_decl() -> impl Parser<Decl> {
@@ -152,8 +162,10 @@ pub fn parse_expr() -> impl Parser<Expr> {
     recursive(|expr| {
         choice((
             parse_lit().map(Expr::Lit),
+            parse_struct_init(expr.clone()).map(Expr::StructInit),
             parse_enum_init(expr.clone()).map(Expr::EnumInit),
             parse_let(expr.clone()).map(Expr::Let),
+            parse_tuple(expr.clone()).map(Expr::Tuple),
             parse_identifier().map(Expr::Var),
         ))
     })
@@ -185,6 +197,46 @@ pub fn parse_let(expr: impl Parser<Expr>) -> impl Parser<Let> {
             value: Box::new(value),
             body: Box::new(body),
         })
+}
+
+fn parse_tuple(expr: impl Parser<Expr>) -> impl Parser<Tuple> {
+    let items = expr
+        .separated_by(just(Token::Comma))
+        .allow_trailing()
+        .collect::<Vec<_>>();
+
+    parens(items).map(|items| Tuple { items })
+}
+
+pub fn parse_struct_init(expr: impl Parser<Expr>) -> impl Parser<StructInit> {
+    let args = parse_named_arg(expr)
+        .separated_by(just(Token::Comma))
+        .allow_trailing()
+        .collect::<Vec<_>>();
+
+    parse_identifier()
+        .then(parens(args))
+        .map(|(id, args)| StructInit { id, args })
+}
+
+pub fn parse_args(expr: impl Parser<Expr>) -> impl Parser<Vec<Arg>> {
+    parse_arg(expr)
+        .separated_by(just(Token::Comma))
+        .allow_trailing()
+        .collect::<Vec<_>>()
+}
+
+pub fn parse_arg(expr: impl Parser<Expr>) -> impl Parser<Arg> {
+    let parse_named = parse_named_arg(expr.clone()).map(Arg::Named);
+    let parse_anon = expr.map(Arg::Anon);
+    choice((parse_named, parse_anon))
+}
+
+pub fn parse_named_arg(expr: impl Parser<Expr>) -> impl Parser<NamedArg> {
+    parse_identifier()
+        .then_ignore(just(Token::Colon))
+        .then(expr)
+        .map(|(name, value)| NamedArg { name, value })
 }
 
 pub fn parse_enum_init(expr: impl Parser<Expr>) -> impl Parser<EnumInit> {

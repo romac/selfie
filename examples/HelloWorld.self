@@ -8,7 +8,7 @@ enum Bar {
     .def
 }
 
-fn add(_ x: Int64, to y: Int64): Int64 {
+fn add(_ x: Int64, to y: Int64): (Int64, Bool) {
   let foo = false
   let a = Bar.abc(123)
   let b = .def
@@ -19,9 +19,9 @@ fn add(_ x: Int64, to y: Int64): Int64 {
 }
 
 fn main(): Unit {
-  // let foo = Foo(x: 1, y: true)
-  // let tup = (42, true, foo.z)
-  // let unit = ()
+  let foo = Foo(x: 1, y: true)
+  let tup = (42, true, foo.z)
+  let unit = ()
   // add(1, y: .def)
   // add(1, 2, z: foo.y.z)
   // add(x: 1, y: 2, z: 3)

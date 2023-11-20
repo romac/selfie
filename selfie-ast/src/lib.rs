@@ -18,6 +18,10 @@ impl Name {
     pub fn is_camel_case(&self) -> bool {
         self.0.chars().next().is_some_and(|c| c.is_uppercase())
     }
+
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
 }
 
 impl fmt::Debug for Name {
@@ -33,6 +37,7 @@ pub enum Type {
     String,
     Bool,
     Unit,
+    Tuple(Vec<Type>),
     Named(Name),
     Fn { args: Vec<Type>, ret: Box<Type> },
 }
