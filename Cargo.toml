@@ -14,7 +14,7 @@ edition = "2021"
 
 [workspace.dependencies]
 ariadne           = { version = "0.3", features = ["auto-color"] }
-chumsky           = "1.0.0-alpha.6"
+chumsky           = { version = "1.0.0-alpha.6", features = ["memoization"] }
 logos             = "0.13"
 nom               = "7"
 ordered-float     = "4"

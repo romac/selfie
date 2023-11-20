@@ -23,7 +23,13 @@ fn main(): Unit {
   let tup = (42, true, foo.z)
   let unit = ()
   let a = add(1, y: .def)
-  // let b = add(1, 2, z: foo.y.z)
+  let b = add(1, 2, z: foo.y.z)
   let c = add(x: 1, y: 2, z: 3)
+  ()
+}
+
+fn foo(x: Foo): Unit {
+  let field = x.y.z
+  let method = x.foo(1, y: 2).bar(d: 3, e: 4)
   ()
 }

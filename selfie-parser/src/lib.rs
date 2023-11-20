@@ -54,7 +54,10 @@ pub fn parse_upper() -> impl Parser<Name> {
 }
 
 pub fn parse_lower() -> impl Parser<Name> {
-    parse_identifier().filter(|id| id.as_str().starts_with(char::is_lowercase))
+    parse_identifier().filter(|id| {
+        id.as_str()
+            .starts_with(|c: char| c.is_lowercase() || c == '_')
+    })
 }
 
 pub fn parse_type() -> impl Parser<Type> {
@@ -166,6 +169,7 @@ pub fn parse_expr() -> impl Parser<Expr> {
     recursive(|expr| {
         choice((
             parse_lit().map(Expr::Lit),
+            parse_field_access_or_method_call(expr.clone()),
             parse_fn_call(expr.clone()).map(Expr::FnCall),
             parse_struct_init(expr.clone()).map(Expr::StructInit),
             parse_enum_init(expr.clone()).map(Expr::EnumInit),
@@ -191,6 +195,34 @@ pub fn parse_lit() -> impl Parser<Literal> {
     choice((other, unit))
 }
 
+pub fn parse_field_access_or_method_call(expr: impl Parser<Expr>) -> impl Parser<Expr> {
+    enum MF {
+        FieldAccess(Name),
+        MethodCall(Name, Vec<Arg>),
+    }
+
+    let mf = choice((
+        parse_fn_call(expr.clone()).map(|FnCall { name, args }| MF::MethodCall(name, args)),
+        parse_lower().map(MF::FieldAccess),
+    ));
+
+    // FIXME: Avoid left-recursion
+    expr.memoized().foldl(
+        just(Token::Dot).ignore_then(mf).repeated().at_least(1),
+        |expr, mf| match mf {
+            MF::FieldAccess(name) => Expr::FieldAccess(FieldAccess {
+                expr: Box::new(expr),
+                name,
+            }),
+            MF::MethodCall(name, args) => Expr::MethodCall(MethodCall {
+                expr: Box::new(expr),
+                name,
+                args,
+            }),
+        },
+    )
+}
+
 pub fn parse_fn_call(expr: impl Parser<Expr>) -> impl Parser<FnCall> {
     parse_lower()
         .then(parens(parse_args(expr)))
@@ -199,7 +231,7 @@ pub fn parse_fn_call(expr: impl Parser<Expr>) -> impl Parser<FnCall> {
 
 pub fn parse_let(expr: impl Parser<Expr>) -> impl Parser<Let> {
     just(Token::Let)
-        .ignore_then(parse_identifier())
+        .ignore_then(parse_lower())
         .then_ignore(just(Token::Equal))
         .then(expr.clone())
         .then(expr.clone())
@@ -225,7 +257,7 @@ pub fn parse_struct_init(expr: impl Parser<Expr>) -> impl Parser<StructInit> {
         .allow_trailing()
         .collect::<Vec<_>>();
 
-    parse_identifier()
+    parse_upper()
         .then(parens(args))
         .map(|(id, args)| StructInit { id, args })
 }
@@ -251,10 +283,10 @@ pub fn parse_named_arg(expr: impl Parser<Expr>) -> impl Parser<NamedArg> {
 }
 
 pub fn parse_enum_init(expr: impl Parser<Expr>) -> impl Parser<EnumInit> {
-    parse_identifier()
+    parse_upper()
         .or_not()
         .then_ignore(just(Token::Dot))
-        .then(parse_identifier())
+        .then(parse_lower())
         .then(parens(expr.map(Box::new)).or_not())
         .map(|((ty, variant), arg)| EnumInit { ty, variant, arg })
 }

@@ -143,14 +143,14 @@ pub struct FnCall {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct MethodCall {
-    pub receiver: Box<Expr>,
+    pub expr: Box<Expr>,
     pub name: Name,
     pub args: Vec<Arg>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct FieldAccess {
-    pub receiver: Box<Expr>,
+    pub expr: Box<Expr>,
     pub name: Name,
 }
 
