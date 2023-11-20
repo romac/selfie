@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use ariadne::Source;
-use selfie_parser::ParseError;
+use selfie_parser::Error;
 
 use selfie::report::parse_error_to_report;
 
@@ -37,7 +37,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn print_errors(path: &Path, input: &str, errors: Vec<ParseError>) {
+fn print_errors(path: &Path, input: &str, errors: Vec<Error>) {
     let id = path.display().to_string();
 
     for e in errors {

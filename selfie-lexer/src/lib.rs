@@ -13,7 +13,7 @@ use util::parse_string;
 pub use logos::Span;
 
 #[derive(Clone, Debug, Error, PartialEq, Eq, Default)]
-pub enum LexError {
+pub enum Error {
     #[error("unexpected token: {1}")]
     UnexpectedToken(Span, Ustr),
 
@@ -31,7 +31,7 @@ pub enum LexError {
     Other,
 }
 
-impl LexError {
+impl Error {
     pub fn span(&self) -> &Span {
         match self {
             Self::UnexpectedToken(span, _) => span,
@@ -53,22 +53,22 @@ mod lexers {
         lex.slice().parse().ok()
     }
 
-    pub fn string(lex: &mut Lexer<Token>) -> Result<Ustr, LexError> {
+    pub fn string(lex: &mut Lexer<Token>) -> Result<Ustr, Error> {
         parse_string(lex.slice())
             .map(|(_, s)| Ustr::from(&s))
-            .map_err(|_| LexError::InvalidStringLiteral(lex.span(), Ustr::from(lex.slice())))
+            .map_err(|_| Error::InvalidStringLiteral(lex.span(), Ustr::from(lex.slice())))
     }
 
-    pub fn int(lex: &mut Lexer<Token>) -> Result<i64, LexError> {
+    pub fn int(lex: &mut Lexer<Token>) -> Result<i64, Error> {
         lex.slice()
             .parse()
-            .map_err(|_| LexError::ParseInt(lex.span(), Ustr::from(lex.slice())))
+            .map_err(|_| Error::ParseInt(lex.span(), Ustr::from(lex.slice())))
     }
 
-    pub fn float(lex: &mut Lexer<Token>) -> Result<OrderedFloat<f64>, LexError> {
+    pub fn float(lex: &mut Lexer<Token>) -> Result<OrderedFloat<f64>, Error> {
         lex.slice()
             .parse()
-            .map_err(|_| LexError::ParseFloat(lex.span(), Ustr::from(lex.slice())))
+            .map_err(|_| Error::ParseFloat(lex.span(), Ustr::from(lex.slice())))
     }
 
     // pub fn comment(lex: &mut Lexer<Token>) -> Option<Ustr> {
@@ -81,7 +81,7 @@ mod lexers {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Logos)]
-#[logos(skip r"[ \t\n\f]+", error = LexError)]
+#[logos(skip r"[ \t\n\f]+", error = Error)]
 pub enum Token {
     #[regex("[a-zA-Z_][a-zA-Z0-9_]*", lexers::intern)]
     Identifier(Ustr),
@@ -237,7 +237,7 @@ impl fmt::Display for Token {
     }
 }
 
-pub fn lex(input: &str) -> Result<Vec<(Token, Span)>, LexError> {
+pub fn lex(input: &str) -> Result<Vec<(Token, Span)>, Error> {
     let mut lexer = Token::lexer(input);
     let mut tokens = Vec::new();
 
@@ -245,8 +245,8 @@ pub fn lex(input: &str) -> Result<Vec<(Token, Span)>, LexError> {
         match token {
             Ok(token) => tokens.push((token, lexer.span())),
 
-            Err(LexError::Other) => {
-                return Err(LexError::UnexpectedToken(
+            Err(Error::Other) => {
+                return Err(Error::UnexpectedToken(
                     lexer.span(),
                     Ustr::from(lexer.slice()),
                 ));
@@ -265,7 +265,7 @@ mod tests {
 
     use pretty_assertions::assert_eq;
 
-    fn toks(input: &str) -> Result<Vec<Token>, LexError> {
+    fn toks(input: &str) -> Result<Vec<Token>, Error> {
         Ok(lex(input)?.into_iter().map(|(t, _)| t).collect::<Vec<_>>())
     }
 
@@ -280,27 +280,21 @@ mod tests {
     #[test]
     fn lex_invalid() {
         let tokens = toks("hello_world 42 \"foo").unwrap_err();
-        assert_eq!(
-            tokens,
-            LexError::UnexpectedToken(15..19, Ustr::from("\"foo"),)
-        );
+        assert_eq!(tokens, Error::UnexpectedToken(15..19, Ustr::from("\"foo"),));
 
         let tokens = toks("trabad%toto");
-        assert_eq!(
-            tokens,
-            Err(LexError::UnexpectedToken(6..7, Ustr::from("%")))
-        );
+        assert_eq!(tokens, Err(Error::UnexpectedToken(6..7, Ustr::from("%"))));
 
         let input = "\"foo\\u{}bar\"";
         let tokens = toks(input).unwrap_err();
         assert_eq!(
             tokens,
-            LexError::InvalidStringLiteral(0..12, Ustr::from(input))
+            Error::InvalidStringLiteral(0..12, Ustr::from(input))
         );
 
         let input = "999999999912491943249329493294932492342347235476236426462348324673264823";
         let tokens = toks(input).unwrap_err();
-        assert_eq!(tokens, LexError::ParseInt(0..72, Ustr::from(input)));
+        assert_eq!(tokens, Error::ParseInt(0..72, Ustr::from(input)));
     }
 
     #[test]

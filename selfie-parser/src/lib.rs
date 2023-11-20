@@ -6,74 +6,32 @@ use chumsky::input::{Input, SpannedInput, Stream};
 use chumsky::primitive::{choice, end, just};
 use chumsky::recursive::recursive;
 use chumsky::span::SimpleSpan;
-use chumsky::util::MaybeRef;
 use chumsky::{extra, select, IterParser};
-use thiserror::Error;
 
 use selfie_ast::*;
-use selfie_lexer::{lex, LexError, Token};
+use selfie_lexer::{lex, Token};
 
-#[derive(Clone, Debug, Error)]
-pub enum ParseError {
-    #[error("Lexing failed: {0}")]
-    Lex(LexError),
-
-    #[error("Expected {expected:?}, found {found:?}")]
-    ExpectedFound {
-        span: Span,
-        expected: Vec<Option<Token>>,
-        found: Option<Token>,
-    },
-}
-
-impl<'a> chumsky::error::Error<'a, ParserInput> for ParseError {
-    fn expected_found<Iter>(expected: Iter, found: Option<MaybeRef<Token>>, span: Span) -> Self
-    where
-        Iter: IntoIterator<Item = Option<MaybeRef<'a, Token>>>,
-    {
-        Self::ExpectedFound {
-            span,
-            expected: expected
-                .into_iter()
-                .map(|e| e.as_deref().copied())
-                .collect(),
-            found: found.as_deref().copied(),
-        }
-    }
-
-    fn merge(mut self, mut other: Self) -> Self {
-        if let (
-            Self::ExpectedFound { expected, .. },
-            Self::ExpectedFound {
-                expected: expected_other,
-                ..
-            },
-        ) = (&mut self, &mut other)
-        {
-            expected.append(expected_other);
-        }
-        self
-    }
-}
+mod error;
+pub use error::Error;
 
 pub type Span = SimpleSpan<usize>;
 pub type Spanned<T> = (T, Span);
 pub type ParserInput = SpannedInput<Token, Span, Stream<std::vec::IntoIter<(Token, Span)>>>;
 
-pub fn parse_file(path: impl AsRef<Path>) -> Result<Module, Vec<ParseError>> {
+pub fn parse_file(path: impl AsRef<Path>) -> Result<Module, Vec<Error>> {
     let contents = std::fs::read_to_string(path).unwrap();
     parse_module(&contents)
 }
 
-fn text_to_input(text: &str) -> Result<ParserInput, LexError> {
-    let tokens = lex(text)?;
+fn text_to_input(text: &str) -> Result<ParserInput, Vec<Error>> {
+    let tokens = lex(text).map_err(|e| vec![Error::Lex(e)])?;
     let len = tokens.len();
     let tokens: Vec<_> = tokens.into_iter().map(|(t, s)| (t, s.into())).collect();
     Ok(Stream::from_iter(tokens).spanned((len..len).into()))
 }
 
-pub fn parse_module(contents: &str) -> Result<Module, Vec<ParseError>> {
-    let input = text_to_input(contents).map_err(|e| vec![ParseError::Lex(e)])?;
+pub fn parse_module(contents: &str) -> Result<Module, Vec<Error>> {
+    let input = text_to_input(contents)?;
 
     let decls = parse_decl()
         .repeated()
@@ -85,7 +43,7 @@ pub fn parse_module(contents: &str) -> Result<Module, Vec<ParseError>> {
     Ok(Module { decls })
 }
 
-pub trait Parser<A> = chumsky::Parser<'static, ParserInput, A, extra::Err<ParseError>> + Clone;
+pub trait Parser<A> = chumsky::Parser<'static, ParserInput, A, extra::Err<Error>> + Clone;
 
 pub fn parse_identifier() -> impl Parser<Name> {
     select!(Token::Identifier(id) => Name::interned(id))

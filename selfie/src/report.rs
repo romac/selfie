@@ -3,18 +3,18 @@ use std::ops::Range;
 use ariadne::{Color, ColorGenerator, Fmt, Label, Report, ReportKind};
 use selfie_lexer::Token;
 
-use crate::parser::ParseError;
+use crate::parser::Error;
 
 pub type ReportSpan = (String, Range<usize>);
 
-pub fn parse_error_to_report<'a>(e: &ParseError, id: String) -> Report<'a, ReportSpan> {
+pub fn parse_error_to_report<'a>(e: &Error, id: String) -> Report<'a, ReportSpan> {
     let mut colors = ColorGenerator::new();
 
     let a = colors.next();
     let b = colors.next();
 
     match e {
-        ParseError::Lex(e) => Report::build(ReportKind::Error, id.clone(), e.span().start)
+        Error::Lex(e) => Report::build(ReportKind::Error, id.clone(), e.span().start)
             .with_code(1)
             .with_message(e.to_string())
             .with_label(
@@ -24,7 +24,7 @@ pub fn parse_error_to_report<'a>(e: &ParseError, id: String) -> Report<'a, Repor
             )
             .finish(),
 
-        ParseError::ExpectedFound {
+        Error::ExpectedFound {
             span,
             expected,
             found,
