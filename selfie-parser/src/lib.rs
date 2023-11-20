@@ -75,7 +75,7 @@ pub fn parse_type() -> impl Parser<Type> {
     recursive(|ty| {
         let tys = ty
             .separated_by(just(Token::Comma))
-            .at_least(1)
+            .at_least(2)
             .allow_trailing()
             .collect::<Vec<_>>();
 
@@ -166,18 +166,76 @@ pub fn parse_param_kind() -> impl Parser<(ParamKind, Name)> {
 }
 
 pub fn parse_expr() -> impl Parser<Expr> {
+    use chumsky::pratt::*;
+
+    let op1 = |op| {
+        move |e| {
+            Expr::UnaryOp(UnaryOp {
+                op,
+                expr: Box::new(e),
+            })
+        }
+    };
+
+    let op2 = |op| {
+        move |l, r| {
+            Expr::BinaryOp(BinaryOp {
+                op,
+                lhs: Box::new(l),
+                rhs: Box::new(r),
+            })
+        }
+    };
+
     recursive(|expr| {
-        choice((
-            parse_lit().map(Expr::Lit),
-            parse_field_access_or_method_call(expr.clone()),
-            parse_fn_call(expr.clone()).map(Expr::FnCall),
-            parse_struct_init(expr.clone()).map(Expr::StructInit),
-            parse_enum_init(expr.clone()).map(Expr::EnumInit),
-            parse_let(expr.clone()).map(Expr::Let),
-            parse_tuple(expr.clone()).map(Expr::Tuple),
-            parse_identifier().map(Expr::Var),
+        parse_atom(expr.clone()).pratt((
+            // - !
+            prefix(10, just(Token::Dash), op1(Op1::Neg)),
+            prefix(10, just(Token::Bang), op1(Op1::Not)),
+            // * / %
+            infix(left(9), just(Token::Star), op2(Op2::Mul)),
+            infix(left(9), just(Token::Slash), op2(Op2::Div)),
+            infix(left(9), just(Token::Percent), op2(Op2::Mod)),
+            // + -
+            infix(left(8), just(Token::Plus), op2(Op2::Add)),
+            infix(left(8), just(Token::Dash), op2(Op2::Sub)),
+            // >> <<
+            // infix(left(7), just(Token::ShiftLeft), op2(Op2::Shl)),
+            // infix(left(7), just(Token::ShiftRight), op2(Op2::Shr)),
+            // < <= > >=
+            infix(left(6), just(Token::Less), op2(Op2::Lt)),
+            infix(left(6), just(Token::LessEqual), op2(Op2::Leq)),
+            infix(left(6), just(Token::Greater), op2(Op2::Gt)),
+            infix(left(6), just(Token::GreaterEqual), op2(Op2::Geq)),
+            // == !=
+            infix(left(6), just(Token::EqualEqual), op2(Op2::Eq)),
+            infix(left(6), just(Token::BangEqual), op2(Op2::Neq)),
+            // &
+            // infix(left(5), just(Token::And), op2(Op2::And)),
+            // ^
+            // infix(left(4), just(Token::Caret), op2(Op2::Xor)),
+            // |
+            // infix(left(3), just(Token::Or), op2(Op2::Or)),
+            // &&
+            infix(left(2), just(Token::AndAnd), op2(Op2::And)),
+            // ||
+            infix(left(1), just(Token::OrOr), op2(Op2::Or)),
         ))
     })
+}
+
+pub fn parse_atom(expr: impl Parser<Expr>) -> impl Parser<Expr> {
+    choice((
+        parse_lit().map(Expr::Lit),
+        parse_field_access_or_method_call(expr.clone()),
+        parse_fn_call(expr.clone()).map(Expr::FnCall),
+        parse_struct_init(expr.clone()).map(Expr::StructInit),
+        parse_enum_init(expr.clone()).map(Expr::EnumInit),
+        parse_let(expr.clone()).map(Expr::Let),
+        parse_tuple(expr.clone()).map(Expr::Tuple),
+        parens(expr.clone()),
+        parse_identifier().map(Expr::Var),
+    ))
 }
 
 pub fn parse_lit() -> impl Parser<Literal> {
@@ -245,6 +303,7 @@ pub fn parse_let(expr: impl Parser<Expr>) -> impl Parser<Let> {
 fn parse_tuple(expr: impl Parser<Expr>) -> impl Parser<Tuple> {
     let items = expr
         .separated_by(just(Token::Comma))
+        .at_least(2)
         .allow_trailing()
         .collect::<Vec<_>>();
 

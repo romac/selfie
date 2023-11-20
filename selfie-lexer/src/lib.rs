@@ -161,6 +161,9 @@ pub enum Token {
     #[token("+")]
     Plus,
 
+    #[token("%")]
+    Percent,
+
     #[token("!")]
     Bang,
 
@@ -186,9 +189,15 @@ pub enum Token {
     LessEqual,
 
     #[token("||")]
-    Or,
+    OrOr,
 
     #[token("&&")]
+    AndAnd,
+
+    #[token("|")]
+    Or,
+
+    #[token("&")]
     And,
 }
 
@@ -223,6 +232,7 @@ impl fmt::Display for Token {
             Star => write!(f, "*"),
             Dash => write!(f, "-"),
             Plus => write!(f, "+"),
+            Percent => write!(f, "%"),
             Bang => write!(f, "!"),
             BangEqual => write!(f, "!="),
             Equal => write!(f, "="),
@@ -231,8 +241,10 @@ impl fmt::Display for Token {
             GreaterEqual => write!(f, ">="),
             Less => write!(f, "<"),
             LessEqual => write!(f, "<="),
-            Or => write!(f, "||"),
-            And => write!(f, "&&"),
+            OrOr => write!(f, "||"),
+            AndAnd => write!(f, "&&"),
+            Or => write!(f, "|"),
+            And => write!(f, "&"),
         }
     }
 }

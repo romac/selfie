@@ -169,7 +169,7 @@ pub struct If {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct BinOp {
+pub struct BinaryOp {
     pub op: Op2,
     pub lhs: Box<Expr>,
     pub rhs: Box<Expr>,
@@ -218,7 +218,7 @@ pub enum Expr {
     Tuple(Tuple),
     Let(Let),
     UnaryOp(UnaryOp),
-    BinOp(BinOp),
+    BinaryOp(BinaryOp),
     If(If),
     StructInit(StructInit),
     EnumInit(EnumInit),
