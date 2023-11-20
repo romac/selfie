@@ -73,7 +73,7 @@ pub struct FnDecl {
     pub name: Name,
     pub params: Vec<Param>,
     pub return_type: Type,
-    pub body: Vec<Expr>,
+    pub body: Expr,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]

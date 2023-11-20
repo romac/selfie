@@ -10,8 +10,11 @@ enum Bar {
 
 fn add(_ x: Int64, to y: Int64): Int64 {
   let foo = false;
-  "hello"
-  // let r = Bar.abc;
+  let a = Bar.abc(123);
+  let b = .def;
+  let c = Bar.ghi;
+  let d = .jkl;
+  ()
   // let s = .abc;
   // x + y
 }
@@ -23,4 +26,5 @@ fn main(): Unit {
   // add(1, y: .def);
   // add(1, 2, z: foo.y.z);
   // add(x: 1, y: 2, z: 3);
+  ()
 }

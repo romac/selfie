@@ -116,14 +116,12 @@ fn parse_fn() -> impl Parser<FnDecl> {
         .allow_trailing()
         .collect::<Vec<_>>();
 
-    let body = parse_expr().repeated().collect::<Vec<_>>();
-
     just(Token::Fn)
         .ignore_then(parse_identifier())
         .then(parens(params))
         .then_ignore(just(Token::Colon))
         .then(parse_type())
-        .then(braces(body))
+        .then(braces(parse_expr()))
         .map(|(((name, params), return_type), body)| FnDecl {
             name,
             params,
@@ -160,8 +158,9 @@ pub fn parse_expr() -> impl Parser<Expr> {
     recursive(|expr| {
         choice((
             parse_lit().map(Expr::Lit),
+            parse_enum_init(expr.clone()).map(Expr::EnumInit),
+            parse_let(expr.clone()).map(Expr::Let),
             parse_identifier().map(Expr::Var),
-            parse_let(expr).map(Expr::Let),
         ))
     })
 }
@@ -195,8 +194,13 @@ pub fn parse_let(expr: impl Parser<Expr>) -> impl Parser<Let> {
         })
 }
 
-pub fn parse_enum_init(_expr: impl Parser<EnumInit>) -> impl Parser<Let> {
-    chumsky::primitive::todo()
+pub fn parse_enum_init(expr: impl Parser<Expr>) -> impl Parser<EnumInit> {
+    parse_identifier()
+        .or_not()
+        .then_ignore(just(Token::Dot))
+        .then(parse_identifier())
+        .then(parens(expr.map(Box::new)).or_not())
+        .map(|((ty, variant), arg)| EnumInit { ty, variant, arg })
 }
 
 fn braces<A>(p: impl Parser<A>) -> impl Parser<A> {
