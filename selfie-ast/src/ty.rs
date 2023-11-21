@@ -1,4 +1,4 @@
-use crate::Name;
+use crate::Sym;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Type {
@@ -8,6 +8,6 @@ pub enum Type {
     Bool,
     Unit,
     Tuple(Vec<Type>),
-    Named(Name),
+    Named(Sym),
     Fn { args: Vec<Type>, ret: Box<Type> },
 }

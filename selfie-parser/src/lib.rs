@@ -33,8 +33,8 @@ pub fn parse_module(contents: &str, path: &Path) -> Result<Module, Vec<Error>> {
         .ignore_then(parse_upper())
         .then(decls)
         .then_ignore(end())
-        .map_with(|(name, decls), meta| Module {
-            name,
+        .map_with(|(sym, decls), meta| Module {
+            sym,
             decls,
             span: meta.span(),
         });
@@ -59,15 +59,15 @@ fn text_to_input(text: &str, path: Ustr) -> Result<ParserInput, Vec<Error>> {
     Ok(Stream::from_iter(tokens).spanned(span(path, count..count)))
 }
 
-pub fn parse_identifier() -> impl Parser<Name> {
-    select!(Token::Identifier(id) => Name::interned(id))
+pub fn parse_identifier() -> impl Parser<Sym> {
+    select!(Token::Identifier(id) => Sym::new(Name::interned(id)))
 }
 
-pub fn parse_upper() -> impl Parser<Name> {
+pub fn parse_upper() -> impl Parser<Sym> {
     parse_identifier().filter(|id| id.as_str().starts_with(char::is_uppercase))
 }
 
-pub fn parse_lower() -> impl Parser<Name> {
+pub fn parse_lower() -> impl Parser<Sym> {
     parse_identifier().filter(|id| {
         id.as_str()
             .starts_with(|c: char| c.is_lowercase() || c == '_')
@@ -75,14 +75,14 @@ pub fn parse_lower() -> impl Parser<Name> {
 }
 
 pub fn parse_type() -> impl Parser<Type> {
-    fn to_type(id: Name) -> Type {
-        match id.as_str() {
+    fn to_type(sym: Sym) -> Type {
+        match sym.as_str() {
             "String" => Type::String,
             "Bool" => Type::Bool,
             "Unit" => Type::Unit,
             "Int64" => Type::Int64,
             "Float64" => Type::Float64,
-            _ => Type::Named(id),
+            _ => Type::Named(sym),
         }
     }
 
@@ -111,8 +111,8 @@ pub fn parse_struct() -> impl Parser<StructDecl> {
     just(Token::Struct)
         .ignore_then(parse_upper())
         .then(braces(fields))
-        .map_with(|(name, fields), meta| StructDecl {
-            name,
+        .map_with(|(sym, fields), meta| StructDecl {
+            sym,
             fields,
             span: meta.span(),
         })
@@ -122,8 +122,8 @@ pub fn parse_field() -> impl Parser<Field> {
     parse_lower()
         .then_ignore(just(Token::Colon))
         .then(parse_type())
-        .map_with(|(name, ty), meta| Field {
-            name,
+        .map_with(|(sym, ty), meta| Field {
+            sym,
             ty,
             span: meta.span(),
         })
@@ -135,8 +135,8 @@ pub fn parse_enum() -> impl Parser<EnumDecl> {
     just(Token::Enum)
         .ignore_then(parse_upper())
         .then(braces(variants))
-        .map_with(|(name, variants), meta| EnumDecl {
-            name,
+        .map_with(|(sym, variants), meta| EnumDecl {
+            sym,
             variants,
             span: meta.span(),
         })
@@ -146,8 +146,8 @@ pub fn parse_variant() -> impl Parser<Variant> {
     just(Token::Dot)
         .ignore_then(parse_lower())
         .then(parens(parse_type()).or_not())
-        .map_with(|(name, ty), meta| Variant {
-            name,
+        .map_with(|(sym, ty), meta| Variant {
+            sym,
             ty,
             span: meta.span(),
         })
@@ -165,8 +165,8 @@ fn parse_fn() -> impl Parser<FnDecl> {
         .then_ignore(just(Token::Colon))
         .then(parse_type())
         .then(braces(parse_expr()))
-        .map_with(|(((name, params), return_type), body), meta| FnDecl {
-            name,
+        .map_with(|(((sym, params), return_type), body), meta| FnDecl {
+            sym,
             params,
             return_type,
             body,
@@ -178,25 +178,25 @@ pub fn parse_param() -> impl Parser<Param> {
     parse_param_kind()
         .then_ignore(just(Token::Colon))
         .then(parse_type())
-        .map_with(|((kind, name), ty), meta| Param {
-            name,
+        .map_with(|((kind, sym), ty), meta| Param {
+            sym,
             kind,
             ty,
             span: meta.span(),
         })
 }
 
-pub fn parse_param_kind() -> impl Parser<(ParamKind, Name)> {
+pub fn parse_param_kind() -> impl Parser<(ParamKind, Sym)> {
     // _ foo: Int
     let anon = just(Token::Under)
         .ignore_then(parse_lower())
-        .map(|name| (ParamKind::Anon, name));
+        .map(|sym| (ParamKind::Anon, sym));
 
     // bar foo: Int
     let alias = parse_lower().map(ParamKind::Alias).then(parse_lower());
 
     // foo: Int
-    let normal = parse_lower().map(|name| (ParamKind::Normal, name));
+    let normal = parse_lower().map(|sym| (ParamKind::Normal, sym));
 
     choice((anon, alias, normal))
 }
@@ -264,8 +264,8 @@ pub fn parse_expr() -> impl Parser<Expr> {
 }
 
 pub fn parse_var() -> impl Parser<Var> {
-    parse_identifier().map_with(|name, meta| Var {
-        name,
+    parse_identifier().map_with(|sym, meta| Var {
+        sym,
         span: meta.span(),
     })
 }
@@ -307,30 +307,32 @@ pub fn parse_field_access_or_method_call(
     use chumsky::span::Span as _;
 
     enum MF {
-        FieldAccess(Name, Span),
-        MethodCall(Name, Vec<Arg>, Span),
+        FieldAccess(Sym, Span),
+        MethodCall(Sym, Vec<Arg>, Span),
     }
 
     let mf = choice((
         parse_fn_call(expr.clone())
-            .map_with(|call, meta| MF::MethodCall(call.name, call.args, meta.span())),
-        parse_lower().map_with(|name, meta| MF::FieldAccess(name, meta.span())),
+            .map_with(|call, meta| MF::MethodCall(call.sym, call.args, meta.span())),
+        parse_lower().map_with(|sym, meta| MF::FieldAccess(sym, meta.span())),
     ));
 
     init.foldl(
         just(Token::Dot).ignore_then(mf).repeated(),
         |expr, mf| match mf {
-            MF::FieldAccess(name, span) => Expr::FieldAccess(FieldAccess {
+            MF::FieldAccess(sym, span) => Expr::FieldAccess(FieldAccess {
                 span: expr.span().union(span),
                 expr: Box::new(expr),
-                name,
+                sym,
             }),
-            MF::MethodCall(name, args, span) => Expr::MethodCall(MethodCall {
-                span: expr.span().union(span),
-                expr: Box::new(expr),
-                name,
-                args,
-            }),
+            MF::MethodCall(sym, args, span) => {
+                Expr::MethodCall(MethodCall {
+                    span: expr.span().union(span),
+                    expr: Box::new(expr),
+                    sym,
+                    args,
+                })
+            }
         },
     )
 }
@@ -338,8 +340,8 @@ pub fn parse_field_access_or_method_call(
 pub fn parse_fn_call(expr: impl Parser<Expr>) -> impl Parser<FnCall> {
     parse_lower()
         .then(parens(parse_args(expr)))
-        .map_with(|(name, args), meta| FnCall {
-            name,
+        .map_with(|(sym, args), meta| FnCall {
+            sym,
             args,
             span: meta.span(),
         })
@@ -351,8 +353,8 @@ pub fn parse_let(expr: impl Parser<Expr>) -> impl Parser<Let> {
         .then_ignore(just(Token::Equal))
         .then(expr.clone())
         .then(expr.clone())
-        .map_with(|((name, value), body), meta| Let {
-            name,
+        .map_with(|((sym, value), body), meta| Let {
+            sym,
             value: Box::new(value),
             body: Box::new(body),
             span: meta.span(),
@@ -404,8 +406,8 @@ pub fn parse_named_arg(expr: impl Parser<Expr>) -> impl Parser<NamedArg> {
     parse_identifier()
         .then_ignore(just(Token::Colon))
         .then(expr)
-        .map_with(|(name, value), meta| NamedArg {
-            name,
+        .map_with(|(sym, value), meta| NamedArg {
+            sym,
             value,
             span: meta.span(),
         })
@@ -417,8 +419,8 @@ pub fn parse_enum_init(expr: impl Parser<Expr>) -> impl Parser<EnumInit> {
         .then_ignore(just(Token::Dot))
         .then(parse_lower())
         .then(parens(expr.map(Box::new)).or_not())
-        .map_with(|((ty, variant), arg), meta| EnumInit {
-            ty,
+        .map_with(|((id, variant), arg), meta| EnumInit {
+            id,
             variant,
             arg,
             span: meta.span(),

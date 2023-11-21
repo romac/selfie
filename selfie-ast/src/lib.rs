@@ -6,6 +6,9 @@ pub type Span = chumsky::span::SimpleSpan<usize, Ustr>;
 mod name;
 pub use name::Name;
 
+mod sym;
+pub use sym::Sym;
+
 mod ty;
 pub use ty::Type;
 
@@ -17,7 +20,7 @@ mod macros;
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Module {
     pub span: Span,
-    pub name: Name,
+    pub sym: Sym,
     pub decls: Vec<Decl>,
 }
 
@@ -45,7 +48,7 @@ impl Literal {
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Var {
     pub span: Span,
-    pub name: Name,
+    pub sym: Sym,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -103,7 +106,7 @@ impl Arg {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct NamedArg {
     pub span: Span,
-    pub name: Name,
+    pub sym: Sym,
     pub value: Expr,
 }
 
@@ -148,7 +151,7 @@ pub struct UnaryOp {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct FnCall {
     pub span: Span,
-    pub name: Name,
+    pub sym: Sym,
     pub args: Vec<Arg>,
 }
 
@@ -156,7 +159,7 @@ pub struct FnCall {
 pub struct MethodCall {
     pub span: Span,
     pub expr: Box<Expr>,
-    pub name: Name,
+    pub sym: Sym,
     pub args: Vec<Arg>,
 }
 
@@ -164,13 +167,13 @@ pub struct MethodCall {
 pub struct FieldAccess {
     pub span: Span,
     pub expr: Box<Expr>,
-    pub name: Name,
+    pub sym: Sym,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Let {
     pub span: Span,
-    pub name: Name,
+    pub sym: Sym,
     pub value: Box<Expr>,
     pub body: Box<Expr>,
 }
@@ -186,15 +189,15 @@ pub struct If {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct StructInit {
     pub span: Span,
-    pub id: Name,
+    pub id: Sym,
     pub args: Vec<NamedArg>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct EnumInit {
     pub span: Span,
-    pub ty: Option<Name>,
-    pub variant: Name,
+    pub id: Option<Sym>,
+    pub variant: Sym,
     pub arg: Option<Box<Expr>>,
 }
 
