@@ -225,9 +225,8 @@ pub fn parse_expr() -> impl Parser<Expr> {
 }
 
 pub fn parse_atom(expr: impl Parser<Expr>) -> impl Parser<Expr> {
-    choice((
+    let init = choice((
         parse_lit().map(Expr::Lit),
-        parse_field_access_or_method_call(expr.clone()),
         parse_fn_call(expr.clone()).map(Expr::FnCall),
         parse_struct_init(expr.clone()).map(Expr::StructInit),
         parse_enum_init(expr.clone()).map(Expr::EnumInit),
@@ -235,7 +234,9 @@ pub fn parse_atom(expr: impl Parser<Expr>) -> impl Parser<Expr> {
         parse_tuple(expr.clone()).map(Expr::Tuple),
         parens(expr.clone()),
         parse_identifier().map(Expr::Var),
-    ))
+    ));
+
+    parse_field_access_or_method_call(init, expr)
 }
 
 pub fn parse_lit() -> impl Parser<Literal> {
@@ -253,7 +254,10 @@ pub fn parse_lit() -> impl Parser<Literal> {
     choice((other, unit))
 }
 
-pub fn parse_field_access_or_method_call(expr: impl Parser<Expr>) -> impl Parser<Expr> {
+pub fn parse_field_access_or_method_call(
+    init: impl Parser<Expr>,
+    expr: impl Parser<Expr>,
+) -> impl Parser<Expr> {
     enum MF {
         FieldAccess(Name),
         MethodCall(Name, Vec<Arg>),
@@ -264,9 +268,8 @@ pub fn parse_field_access_or_method_call(expr: impl Parser<Expr>) -> impl Parser
         parse_lower().map(MF::FieldAccess),
     ));
 
-    // FIXME: Avoid left-recursion
-    expr.memoized().foldl(
-        just(Token::Dot).ignore_then(mf).repeated().at_least(1),
+    init.foldl(
+        just(Token::Dot).ignore_then(mf).repeated(),
         |expr, mf| match mf {
             MF::FieldAccess(name) => Expr::FieldAccess(FieldAccess {
                 expr: Box::new(expr),
