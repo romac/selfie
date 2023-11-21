@@ -21,7 +21,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     let path = Path::new(&args[1]);
     let input = std::fs::read_to_string(path)?;
-    let module = selfie::parser::parse_module(&input);
+    let module = selfie::parser::parse_module(&input, path);
 
     match module {
         Ok(module) => {

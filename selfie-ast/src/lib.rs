@@ -1,6 +1,8 @@
 pub use ordered_float::OrderedFloat;
 pub use ustr::Ustr;
 
+pub type Span = chumsky::span::SimpleSpan<usize, Ustr>;
+
 mod name;
 pub use name::Name;
 
@@ -10,24 +12,46 @@ pub use ty::Type;
 mod decl;
 pub use decl::{Decl, EnumDecl, Field, FnDecl, Param, ParamKind, StructDecl, Variant};
 
+mod macros;
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Module {
+    pub span: Span,
+    pub name: Name,
     pub decls: Vec<Decl>,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Literal {
-    Int64(i64),
-    Float64(OrderedFloat<f64>),
-    Bool(bool),
-    String(Ustr),
-    Unit,
+    Int64(Span, i64),
+    Float64(Span, OrderedFloat<f64>),
+    Bool(Span, bool),
+    String(Span, Ustr),
+    Unit(Span),
+}
+
+impl Literal {
+    pub fn span(&self) -> Span {
+        match self {
+            Self::Int64(span, _) => *span,
+            Self::Float64(span, _) => *span,
+            Self::Bool(span, _) => *span,
+            Self::String(span, _) => *span,
+            Self::Unit(span) => *span,
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Var {
+    pub span: Span,
+    pub name: Name,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Expr {
     Lit(Literal),
-    Var(Name),
+    Var(Var),
     FnCall(FnCall),
     MethodCall(MethodCall),
     FieldAccess(FieldAccess),
@@ -41,14 +65,44 @@ pub enum Expr {
     Return(Box<Expr>),
 }
 
+impl Expr {
+    pub fn span(&self) -> Span {
+        match self {
+            Self::Lit(lit) => lit.span(),
+            Self::Var(var) => var.span(),
+            Self::FnCall(call) => call.span(),
+            Self::MethodCall(call) => call.span(),
+            Self::FieldAccess(field) => field.span(),
+            Self::Tuple(tuple) => tuple.span(),
+            Self::Let(let_) => let_.span(),
+            Self::UnaryOp(op) => op.span(),
+            Self::BinaryOp(op) => op.span(),
+            Self::If(if_) => if_.span(),
+            Self::StructInit(init) => init.span(),
+            Self::EnumInit(init) => init.span(),
+            Self::Return(expr) => expr.span(),
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Arg {
     Named(NamedArg),
     Anon(Expr),
 }
 
+impl Arg {
+    pub fn span(&self) -> Span {
+        match self {
+            Self::Named(arg) => arg.span(),
+            Self::Anon(expr) => expr.span(),
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct NamedArg {
+    pub span: Span,
     pub name: Name,
     pub value: Expr,
 }
@@ -72,6 +126,7 @@ pub enum Op2 {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct BinaryOp {
+    pub span: Span,
     pub op: Op2,
     pub lhs: Box<Expr>,
     pub rhs: Box<Expr>,
@@ -85,18 +140,21 @@ pub enum Op1 {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct UnaryOp {
+    pub span: Span,
     pub op: Op1,
     pub expr: Box<Expr>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct FnCall {
+    pub span: Span,
     pub name: Name,
     pub args: Vec<Arg>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct MethodCall {
+    pub span: Span,
     pub expr: Box<Expr>,
     pub name: Name,
     pub args: Vec<Arg>,
@@ -104,12 +162,14 @@ pub struct MethodCall {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct FieldAccess {
+    pub span: Span,
     pub expr: Box<Expr>,
     pub name: Name,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Let {
+    pub span: Span,
     pub name: Name,
     pub value: Box<Expr>,
     pub body: Box<Expr>,
@@ -117,6 +177,7 @@ pub struct Let {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct If {
+    pub span: Span,
     pub cnd: Box<Expr>,
     pub thn: Box<Expr>,
     pub els: Box<Expr>,
@@ -124,12 +185,14 @@ pub struct If {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct StructInit {
+    pub span: Span,
     pub id: Name,
     pub args: Vec<NamedArg>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct EnumInit {
+    pub span: Span,
     pub ty: Option<Name>,
     pub variant: Name,
     pub arg: Option<Box<Expr>>,
@@ -137,5 +200,22 @@ pub struct EnumInit {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Tuple {
+    pub span: Span,
     pub items: Vec<Expr>,
 }
+
+impl_span!(
+    Module,
+    Var,
+    NamedArg,
+    BinaryOp,
+    UnaryOp,
+    FnCall,
+    MethodCall,
+    FieldAccess,
+    Let,
+    If,
+    StructInit,
+    EnumInit,
+    Tuple
+);

@@ -1,6 +1,6 @@
 TODO:
 
-- Replace FieldAccess, FnCall, MethodCall, EnumInit and StructInit with a single Call and Select variant
+- [ast, parser] Replace FieldAccess, FnCall, MethodCall, EnumInit and StructInit with a single Call and Select variant
   - Disambiguate after typing
-- Replace sub-expressions, etc. with ids
-
+- [ast, parser] Replace sub-expressions, etc. with ids
+- [lexer] Remove dependency on `nom`

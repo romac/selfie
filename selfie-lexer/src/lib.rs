@@ -101,6 +101,9 @@ pub enum Token {
     #[regex("//[^\n]*", logos::skip)]
     Comment,
 
+    #[token("module")]
+    Module,
+
     #[token("fn")]
     Fn,
 
@@ -212,6 +215,7 @@ impl fmt::Display for Token {
             Bool(b) => write!(f, "{b}"),
             String(s) => write!(f, "\"{s}\""),
             Comment => Ok(()),
+            Module => write!(f, "module"),
             Fn => write!(f, "fn"),
             Struct => write!(f, "struct"),
             Enum => write!(f, "enum"),

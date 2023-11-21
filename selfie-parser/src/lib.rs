@@ -5,7 +5,6 @@ use std::path::Path;
 use chumsky::input::{Input, SpannedInput, Stream};
 use chumsky::primitive::{choice, end, just};
 use chumsky::recursive::recursive;
-use chumsky::span::SimpleSpan;
 use chumsky::{extra, select, IterParser};
 
 use selfie_ast::*;
@@ -14,36 +13,51 @@ use selfie_lexer::{lex, Token};
 mod error;
 pub use error::Error;
 
-pub type Span = SimpleSpan<usize>;
-pub type Spanned<T> = (T, Span);
 pub type ParserInput = SpannedInput<Token, Span, Stream<std::vec::IntoIter<(Token, Span)>>>;
+pub trait Parser<A> = chumsky::Parser<'static, ParserInput, A, extra::Err<Error>> + Clone;
 
 pub fn parse_file(path: impl AsRef<Path>) -> Result<Module, Vec<Error>> {
+    let path = path.as_ref();
     let contents = std::fs::read_to_string(path).unwrap();
-    parse_module(&contents)
+
+    parse_module(&contents, path)
 }
 
-fn text_to_input(text: &str) -> Result<ParserInput, Vec<Error>> {
-    let tokens = lex(text).map_err(|e| vec![Error::Lex(e)])?;
-    let len = tokens.len();
-    let tokens: Vec<_> = tokens.into_iter().map(|(t, s)| (t, s.into())).collect();
-    Ok(Stream::from_iter(tokens).spanned((len..len).into()))
-}
+pub fn parse_module(contents: &str, path: &Path) -> Result<Module, Vec<Error>> {
+    let path = Ustr::from(&path.display().to_string());
+    let input = text_to_input(contents, path)?;
 
-pub fn parse_module(contents: &str) -> Result<Module, Vec<Error>> {
-    let input = text_to_input(contents)?;
+    let decls = parse_decl().repeated().collect::<Vec<_>>();
 
-    let decls = parse_decl()
-        .repeated()
-        .collect::<Vec<_>>()
+    let parser = just(Token::Module)
+        .ignore_then(parse_upper())
+        .then(decls)
         .then_ignore(end())
-        .parse(input)
-        .into_result()?;
+        .map_with(|(name, decls), meta| Module {
+            name,
+            decls,
+            span: meta.span(),
+        });
 
-    Ok(Module { decls })
+    let module = parser.parse(input).into_result()?;
+    Ok(module)
 }
 
-pub trait Parser<A> = chumsky::Parser<'static, ParserInput, A, extra::Err<Error>> + Clone;
+fn span(path: Ustr, range: std::ops::Range<usize>) -> Span {
+    <Span as chumsky::span::Span>::new(path, range)
+}
+
+fn text_to_input(text: &str, path: Ustr) -> Result<ParserInput, Vec<Error>> {
+    let tokens = lex(text).map_err(|e| vec![Error::Lex(e)])?;
+    let count = tokens.len();
+
+    let tokens: Vec<_> = tokens
+        .into_iter()
+        .map(|(token, range)| (token, span(path, range)))
+        .collect();
+
+    Ok(Stream::from_iter(tokens).spanned(span(path, count..count)))
+}
 
 pub fn parse_identifier() -> impl Parser<Name> {
     select!(Token::Identifier(id) => Name::interned(id))
@@ -97,14 +111,22 @@ pub fn parse_struct() -> impl Parser<StructDecl> {
     just(Token::Struct)
         .ignore_then(parse_upper())
         .then(braces(fields))
-        .map(|(name, fields)| StructDecl { name, fields })
+        .map_with(|(name, fields), meta| StructDecl {
+            name,
+            fields,
+            span: meta.span(),
+        })
 }
 
 pub fn parse_field() -> impl Parser<Field> {
     parse_lower()
         .then_ignore(just(Token::Colon))
         .then(parse_type())
-        .map(|(name, ty)| Field { name, ty })
+        .map_with(|(name, ty), meta| Field {
+            name,
+            ty,
+            span: meta.span(),
+        })
 }
 
 pub fn parse_enum() -> impl Parser<EnumDecl> {
@@ -113,14 +135,22 @@ pub fn parse_enum() -> impl Parser<EnumDecl> {
     just(Token::Enum)
         .ignore_then(parse_upper())
         .then(braces(variants))
-        .map(|(name, variants)| EnumDecl { name, variants })
+        .map_with(|(name, variants), meta| EnumDecl {
+            name,
+            variants,
+            span: meta.span(),
+        })
 }
 
 pub fn parse_variant() -> impl Parser<Variant> {
     just(Token::Dot)
         .ignore_then(parse_lower())
         .then(parens(parse_type()).or_not())
-        .map(|(name, ty)| Variant { name, ty })
+        .map_with(|(name, ty), meta| Variant {
+            name,
+            ty,
+            span: meta.span(),
+        })
 }
 
 fn parse_fn() -> impl Parser<FnDecl> {
@@ -135,11 +165,12 @@ fn parse_fn() -> impl Parser<FnDecl> {
         .then_ignore(just(Token::Colon))
         .then(parse_type())
         .then(braces(parse_expr()))
-        .map(|(((name, params), return_type), body)| FnDecl {
+        .map_with(|(((name, params), return_type), body), meta| FnDecl {
             name,
             params,
             return_type,
             body,
+            span: meta.span(),
         })
 }
 
@@ -147,7 +178,12 @@ pub fn parse_param() -> impl Parser<Param> {
     parse_param_kind()
         .then_ignore(just(Token::Colon))
         .then(parse_type())
-        .map(|((kind, name), ty)| Param { name, ty, kind })
+        .map_with(|((kind, name), ty), meta| Param {
+            name,
+            kind,
+            ty,
+            span: meta.span(),
+        })
 }
 
 pub fn parse_param_kind() -> impl Parser<(ParamKind, Name)> {
@@ -167,10 +203,12 @@ pub fn parse_param_kind() -> impl Parser<(ParamKind, Name)> {
 
 pub fn parse_expr() -> impl Parser<Expr> {
     use chumsky::pratt::*;
+    use chumsky::span::Span as _;
 
     let op1 = |op| {
-        move |e| {
+        move |e: Expr| {
             Expr::UnaryOp(UnaryOp {
+                span: e.span(),
                 op,
                 expr: Box::new(e),
             })
@@ -178,8 +216,9 @@ pub fn parse_expr() -> impl Parser<Expr> {
     };
 
     let op2 = |op| {
-        move |l, r| {
+        move |l: Expr, r: Expr| {
             Expr::BinaryOp(BinaryOp {
+                span: l.span().union(r.span()),
                 op,
                 lhs: Box::new(l),
                 rhs: Box::new(r),
@@ -224,6 +263,13 @@ pub fn parse_expr() -> impl Parser<Expr> {
     })
 }
 
+pub fn parse_var() -> impl Parser<Var> {
+    parse_identifier().map_with(|name, meta| Var {
+        name,
+        span: meta.span(),
+    })
+}
+
 pub fn parse_atom(expr: impl Parser<Expr>) -> impl Parser<Expr> {
     let init = choice((
         parse_lit().map(Expr::Lit),
@@ -233,7 +279,7 @@ pub fn parse_atom(expr: impl Parser<Expr>) -> impl Parser<Expr> {
         parse_let(expr.clone()).map(Expr::Let),
         parse_tuple(expr.clone()).map(Expr::Tuple),
         parens(expr.clone()),
-        parse_identifier().map(Expr::Var),
+        parse_var().map(Expr::Var),
     ));
 
     parse_field_access_or_method_call(init, expr)
@@ -241,15 +287,15 @@ pub fn parse_atom(expr: impl Parser<Expr>) -> impl Parser<Expr> {
 
 pub fn parse_lit() -> impl Parser<Literal> {
     let other = select! {
-        Token::String(s) => Literal::String(s),
-        Token::Float64(f) => Literal::Float64(f),
-        Token::Int64(i) => Literal::Int64(i),
-        Token::Bool(b) => Literal::Bool(b),
+        Token::String(s) = meta => Literal::String(meta.span(), s),
+        Token::Float64(f) = meta => Literal::Float64(meta.span(), f),
+        Token::Int64(i) = meta => Literal::Int64(meta.span(), i),
+        Token::Bool(b) = meta => Literal::Bool(meta.span(), b),
     };
 
     let unit = just(Token::ParenOpen)
         .then(just(Token::ParenClose))
-        .to(Literal::Unit);
+        .map_with(|_, meta| Literal::Unit(meta.span()));
 
     choice((other, unit))
 }
@@ -258,24 +304,29 @@ pub fn parse_field_access_or_method_call(
     init: impl Parser<Expr>,
     expr: impl Parser<Expr>,
 ) -> impl Parser<Expr> {
+    use chumsky::span::Span as _;
+
     enum MF {
-        FieldAccess(Name),
-        MethodCall(Name, Vec<Arg>),
+        FieldAccess(Name, Span),
+        MethodCall(Name, Vec<Arg>, Span),
     }
 
     let mf = choice((
-        parse_fn_call(expr.clone()).map(|FnCall { name, args }| MF::MethodCall(name, args)),
-        parse_lower().map(MF::FieldAccess),
+        parse_fn_call(expr.clone())
+            .map_with(|call, meta| MF::MethodCall(call.name, call.args, meta.span())),
+        parse_lower().map_with(|name, meta| MF::FieldAccess(name, meta.span())),
     ));
 
     init.foldl(
         just(Token::Dot).ignore_then(mf).repeated(),
         |expr, mf| match mf {
-            MF::FieldAccess(name) => Expr::FieldAccess(FieldAccess {
+            MF::FieldAccess(name, span) => Expr::FieldAccess(FieldAccess {
+                span: expr.span().union(span),
                 expr: Box::new(expr),
                 name,
             }),
-            MF::MethodCall(name, args) => Expr::MethodCall(MethodCall {
+            MF::MethodCall(name, args, span) => Expr::MethodCall(MethodCall {
+                span: expr.span().union(span),
                 expr: Box::new(expr),
                 name,
                 args,
@@ -287,7 +338,11 @@ pub fn parse_field_access_or_method_call(
 pub fn parse_fn_call(expr: impl Parser<Expr>) -> impl Parser<FnCall> {
     parse_lower()
         .then(parens(parse_args(expr)))
-        .map(|(name, args)| FnCall { name, args })
+        .map_with(|(name, args), meta| FnCall {
+            name,
+            args,
+            span: meta.span(),
+        })
 }
 
 pub fn parse_let(expr: impl Parser<Expr>) -> impl Parser<Let> {
@@ -296,10 +351,11 @@ pub fn parse_let(expr: impl Parser<Expr>) -> impl Parser<Let> {
         .then_ignore(just(Token::Equal))
         .then(expr.clone())
         .then(expr.clone())
-        .map(|((name, value), body)| Let {
+        .map_with(|((name, value), body), meta| Let {
             name,
             value: Box::new(value),
             body: Box::new(body),
+            span: meta.span(),
         })
 }
 
@@ -310,7 +366,10 @@ fn parse_tuple(expr: impl Parser<Expr>) -> impl Parser<Tuple> {
         .allow_trailing()
         .collect::<Vec<_>>();
 
-    parens(items).map(|items| Tuple { items })
+    parens(items).map_with(|items, meta| Tuple {
+        items,
+        span: meta.span(),
+    })
 }
 
 pub fn parse_struct_init(expr: impl Parser<Expr>) -> impl Parser<StructInit> {
@@ -321,7 +380,11 @@ pub fn parse_struct_init(expr: impl Parser<Expr>) -> impl Parser<StructInit> {
 
     parse_upper()
         .then(parens(args))
-        .map(|(id, args)| StructInit { id, args })
+        .map_with(|(id, args), meta| StructInit {
+            id,
+            args,
+            span: meta.span(),
+        })
 }
 
 pub fn parse_args(expr: impl Parser<Expr>) -> impl Parser<Vec<Arg>> {
@@ -341,7 +404,11 @@ pub fn parse_named_arg(expr: impl Parser<Expr>) -> impl Parser<NamedArg> {
     parse_identifier()
         .then_ignore(just(Token::Colon))
         .then(expr)
-        .map(|(name, value)| NamedArg { name, value })
+        .map_with(|(name, value), meta| NamedArg {
+            name,
+            value,
+            span: meta.span(),
+        })
 }
 
 pub fn parse_enum_init(expr: impl Parser<Expr>) -> impl Parser<EnumInit> {
@@ -350,7 +417,12 @@ pub fn parse_enum_init(expr: impl Parser<Expr>) -> impl Parser<EnumInit> {
         .then_ignore(just(Token::Dot))
         .then(parse_lower())
         .then(parens(expr.map(Box::new)).or_not())
-        .map(|((ty, variant), arg)| EnumInit { ty, variant, arg })
+        .map_with(|((ty, variant), arg), meta| EnumInit {
+            ty,
+            variant,
+            arg,
+            span: meta.span(),
+        })
 }
 
 fn braces<A>(p: impl Parser<A>) -> impl Parser<A> {
@@ -390,20 +462,20 @@ mod tests {
 
     #[test]
     fn parse_braces() {
-        let input = text_to_input(r#" { hello_world }"#).unwrap();
+        let input = text_to_input(r#" { hello_world }"#, Ustr::from(file!())).unwrap();
         let expr = braces(parse_identifier()).parse(input).unwrap();
     }
 
     #[test]
     fn parse_sep_by() {
-        let input = text_to_input(r#"foo, bar"#).unwrap();
+        let input = text_to_input(r#"foo, bar"#, Ustr::from(file!())).unwrap();
         let expr = parse_identifier()
             .separated_by(just(Token::Comma))
             .collect::<Vec<_>>()
             .parse(input)
             .unwrap();
 
-        let input = text_to_input(r#"foo, bar,"#).unwrap();
+        let input = text_to_input(r#"foo, bar,"#, Ustr::from(file!())).unwrap();
         let expr = parse_identifier()
             .separated_by(just(Token::Comma))
             .allow_trailing()
@@ -411,7 +483,7 @@ mod tests {
             .parse(input)
             .unwrap();
 
-        let input = text_to_input(r#" { foo, bar, }"#).unwrap();
+        let input = text_to_input(r#" { foo, bar, }"#, Ustr::from(file!())).unwrap();
         let expr = braces(
             parse_identifier()
                 .separated_by(just(Token::Comma))
@@ -421,7 +493,7 @@ mod tests {
         .parse(input)
         .unwrap();
 
-        let input = text_to_input(r#" { foo: Int64, bar: String, }"#).unwrap();
+        let input = text_to_input(r#" { foo: Int64, bar: String, }"#, Ustr::from(file!())).unwrap();
         let expr = braces(
             parse_field()
                 .separated_by(just(Token::Comma))
@@ -431,15 +503,4 @@ mod tests {
         .parse(input)
         .unwrap();
     }
-
-    // #[test]
-    // fn parse_arith() {
-    //     let mut tokens = lex(r#" x + 2 * y - 3 / 4 + z"#)
-    //         .unwrap()
-    //         .into_iter()
-    //         .peekable();
-    //     let expr = parse_expr(&mut tokens).unwrap();
-    //     dbg!(&tokens);
-    //     println!("{:#?}", expr);
-    // }
 }

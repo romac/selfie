@@ -1,3 +1,5 @@
+module HelloWorld
+
 struct Foo {
     x: Int64
     y: Bool

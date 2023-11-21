@@ -41,7 +41,7 @@ pub fn parse_error_to_report<'a>(e: &Error, id: String) -> Report<'a, ReportSpan
                     "Unexpected token {found}, expected {one_of}{expected}",
                 ))
                 .with_label(
-                    Label::new((id.clone(), span.into_range()))
+                    Label::new((id.clone(), span.start..span.end))
                         .with_message(format!("Unexpected token {found}"))
                         .with_color(a),
                 )
