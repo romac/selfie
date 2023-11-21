@@ -1,59 +1,44 @@
-use std::fmt;
-
 pub use ordered_float::OrderedFloat;
 pub use ustr::Ustr;
 
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Name(Ustr);
+mod name;
+pub use name::Name;
 
-impl Name {
-    pub fn new(s: &str) -> Self {
-        Self::interned(Ustr::from(s))
-    }
+mod ty;
+pub use ty::Type;
 
-    pub fn interned(u: Ustr) -> Self {
-        Self(u)
-    }
+mod decl;
+pub use decl::{Decl, EnumDecl, Field, FnDecl, Param, ParamKind, StructDecl, Variant};
 
-    pub fn is_camel_case(&self) -> bool {
-        self.0.chars().next().is_some_and(|c| c.is_uppercase())
-    }
-
-    pub fn as_str(&self) -> &str {
-        self.0.as_str()
-    }
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Module {
+    pub decls: Vec<Decl>,
 }
 
-impl fmt::Debug for Name {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0.as_str())
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum Type {
-    Int64,
-    Float64,
-    String,
-    Bool,
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub enum Literal {
+    Int64(i64),
+    Float64(OrderedFloat<f64>),
+    Bool(bool),
+    String(Ustr),
     Unit,
-    Tuple(Vec<Type>),
-    Named(Name),
-    Fn { args: Vec<Type>, ret: Box<Type> },
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Param {
-    pub name: Name,
-    pub ty: Type,
-    pub kind: ParamKind,
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum ParamKind {
-    Anon,
-    Normal,
-    Alias(Name),
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum Expr {
+    Lit(Literal),
+    Var(Name),
+    FnCall(FnCall),
+    MethodCall(MethodCall),
+    FieldAccess(FieldAccess),
+    Tuple(Tuple),
+    Let(Let),
+    UnaryOp(UnaryOp),
+    BinaryOp(BinaryOp),
+    If(If),
+    StructInit(StructInit),
+    EnumInit(EnumInit),
+    Return(Box<Expr>),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -66,50 +51,6 @@ pub enum Arg {
 pub struct NamedArg {
     pub name: Name,
     pub value: Expr,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct Module {
-    pub decls: Vec<Decl>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct FnDecl {
-    pub name: Name,
-    pub params: Vec<Param>,
-    pub return_type: Type,
-    pub body: Expr,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct StructDecl {
-    pub name: Name,
-    pub fields: Vec<Field>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Field {
-    pub name: Name,
-    pub ty: Type,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct EnumDecl {
-    pub name: Name,
-    pub variants: Vec<Variant>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct Variant {
-    pub name: Name,
-    pub ty: Option<Type>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum Decl {
-    Fn(FnDecl),
-    Struct(StructDecl),
-    Enum(EnumDecl),
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
@@ -129,10 +70,23 @@ pub enum Op2 {
     Or,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct BinaryOp {
+    pub op: Op2,
+    pub lhs: Box<Expr>,
+    pub rhs: Box<Expr>,
+}
+
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Op1 {
     Not,
     Neg,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct UnaryOp {
+    pub op: Op1,
+    pub expr: Box<Expr>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -169,19 +123,6 @@ pub struct If {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct BinaryOp {
-    pub op: Op2,
-    pub lhs: Box<Expr>,
-    pub rhs: Box<Expr>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct UnaryOp {
-    pub op: Op1,
-    pub expr: Box<Expr>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct StructInit {
     pub id: Name,
     pub args: Vec<NamedArg>,
@@ -197,30 +138,4 @@ pub struct EnumInit {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Tuple {
     pub items: Vec<Expr>,
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub enum Literal {
-    Int64(i64),
-    Float64(OrderedFloat<f64>),
-    Bool(bool),
-    String(Ustr),
-    Unit,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum Expr {
-    Lit(Literal),
-    Var(Name),
-    FnCall(FnCall),
-    MethodCall(MethodCall),
-    FieldAccess(FieldAccess),
-    Tuple(Tuple),
-    Let(Let),
-    UnaryOp(UnaryOp),
-    BinaryOp(BinaryOp),
-    If(If),
-    StructInit(StructInit),
-    EnumInit(EnumInit),
-    Return(Box<Expr>),
 }
