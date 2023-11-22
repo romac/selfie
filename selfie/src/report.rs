@@ -3,18 +3,19 @@ use std::ops::Range;
 use ariadne::{Color, ColorGenerator, Fmt, Label, Report, ReportKind};
 use selfie_lexer::Token;
 
-use crate::parser::Error;
+use crate::namer::Error as NamerError;
+use crate::parser::Error as ParseError;
 
 pub type ReportSpan = (String, Range<usize>);
 
-pub fn parse_error_to_report<'a>(e: &Error, id: String) -> Report<'a, ReportSpan> {
+pub fn parse_error_to_report<'a>(e: &ParseError, id: String) -> Report<'a, ReportSpan> {
     let mut colors = ColorGenerator::new();
 
     let a = colors.next();
     let b = colors.next();
 
     match e {
-        Error::Lex(e) => Report::build(ReportKind::Error, id.clone(), e.span().start)
+        ParseError::Lex(e) => Report::build(ReportKind::Error, id.clone(), e.span().start)
             .with_code(1)
             .with_message(e.to_string())
             .with_label(
@@ -24,7 +25,7 @@ pub fn parse_error_to_report<'a>(e: &Error, id: String) -> Report<'a, ReportSpan
             )
             .finish(),
 
-        Error::ExpectedFound {
+        ParseError::ExpectedFound {
             span,
             expected,
             found,
@@ -37,9 +38,7 @@ pub fn parse_error_to_report<'a>(e: &Error, id: String) -> Report<'a, ReportSpan
 
             Report::build(ReportKind::Error, id.clone(), span.start)
                 .with_code(2)
-                .with_message(format!(
-                    "Unexpected token {found}, expected {one_of}{expected}",
-                ))
+                .with_message(format!("Unexpected token {found}, expected {one_of}{expected}",))
                 .with_label(
                     Label::new((id.clone(), span.start..span.end))
                         .with_message(format!("Unexpected token {found}"))
@@ -48,6 +47,24 @@ pub fn parse_error_to_report<'a>(e: &Error, id: String) -> Report<'a, ReportSpan
                 .finish()
         }
     }
+}
+
+pub fn namer_error_to_report<'a>(e: &NamerError, id: String) -> Report<'a, ReportSpan> {
+    let mut colors = ColorGenerator::new();
+
+    let a = colors.next();
+
+    let span = e.span();
+
+    Report::build(ReportKind::Error, id.clone(), span.start)
+        .with_code(2)
+        .with_message(e.to_string())
+        .with_label(
+            Label::new((id.clone(), span.start..span.end))
+                .with_message(e.to_string())
+                .with_color(a),
+        )
+        .finish()
 }
 
 fn fmt_expected(tokens: &[Option<Token>], color: Color) -> String {

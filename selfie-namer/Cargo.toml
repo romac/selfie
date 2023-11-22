@@ -1,0 +1,9 @@
+[package]
+name = "selfie-namer"
+
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+selfie-ast = { path = "../selfie-ast" }
+thiserror.workspace = true

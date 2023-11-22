@@ -8,6 +8,7 @@ edition.workspace = true
 selfie-ast    = { path = "../selfie-ast" }
 selfie-lexer  = { path = "../selfie-lexer" }
 selfie-parser = { path = "../selfie-parser" }
+selfie-namer  = { path = "../selfie-namer" }
 
 ariadne.workspace       = true
 chumsky.workspace       = true

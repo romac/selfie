@@ -6,6 +6,7 @@ members = [
   "selfie-lexer",
   "selfie-ast",
   "selfie-parser",
+  "selfie-namer",
 ]
 
 [workspace.package]

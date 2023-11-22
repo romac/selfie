@@ -15,7 +15,14 @@ pub use ty::Type;
 mod decl;
 pub use decl::{Decl, EnumDecl, Field, FnDecl, Param, ParamKind, StructDecl, Variant};
 
+pub mod visitor;
+
 mod macros;
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Program {
+    pub modules: Vec<Module>,
+}
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Module {
@@ -222,3 +229,5 @@ impl_span!(
     EnumInit,
     Tuple
 );
+
+impl_sym!(Module, Var, NamedArg, FnCall, MethodCall, FieldAccess, Let);
