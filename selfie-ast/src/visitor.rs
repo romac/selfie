@@ -1,5 +1,5 @@
 mod expr;
-pub use expr::{walk_expr, ExprVisitor};
+pub use expr::*;
 
 mod ty;
-pub use ty::{walk_type, TypeVisitor};
+pub use ty::*;

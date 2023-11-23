@@ -3,8 +3,17 @@ pub use ustr::Ustr;
 
 pub type Span = chumsky::span::SimpleSpan<usize, Ustr>;
 
+mod call_graph;
+pub use call_graph::CallGraph;
+
+mod decl;
+pub use decl::{Decl, EnumDecl, Field, FnDecl, Param, ParamKind, StructDecl, Variant};
+
 mod name;
 pub use name::Name;
+
+mod program;
+pub use program::Program;
 
 mod sym;
 pub use sym::Sym;
@@ -12,23 +21,32 @@ pub use sym::Sym;
 mod ty;
 pub use ty::Type;
 
-mod decl;
-pub use decl::{Decl, EnumDecl, Field, FnDecl, Param, ParamKind, StructDecl, Variant};
-
+pub mod utils;
 pub mod visitor;
 
 mod macros;
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct Program {
-    pub modules: Vec<Module>,
-}
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Module {
     pub span: Span,
     pub sym: Sym,
     pub decls: Vec<Decl>,
+}
+
+impl Module {
+    pub fn fns(&self) -> impl Iterator<Item = &FnDecl> + '_ {
+        self.decls.iter().filter_map(|decl| match decl {
+            Decl::Fn(fn_decl) => Some(fn_decl),
+            _ => None,
+        })
+    }
+
+    pub fn fns_mut(&mut self) -> impl Iterator<Item = &mut FnDecl> + '_ {
+        self.decls.iter_mut().filter_map(|decl| match decl {
+            Decl::Fn(fn_decl) => Some(fn_decl),
+            _ => None,
+        })
+    }
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]

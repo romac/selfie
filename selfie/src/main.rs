@@ -54,6 +54,12 @@ fn pipeline(input: &str, path: &Path) -> Result<(), Vec<Error>> {
         modules: vec![module],
     };
 
+    let cg = program.build_call_graph();
+
+    for fn_ in program.fns() {
+        dbg!(cg.build_fn_info(fn_.sym));
+    }
+
     let namer = Namer::new();
     let syms = namer
         .name_program(&mut program)

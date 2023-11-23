@@ -4,7 +4,7 @@ use std::collections::HashSet;
 
 use thiserror::Error;
 
-use selfie_ast::visitor::{ExprVisitor, TypeVisitor};
+use selfie_ast::visitor::{ExprVisitorMut, TypeVisitor};
 use selfie_ast::*;
 
 mod symbol_table;
@@ -23,6 +23,8 @@ pub enum Error {
 
     #[error("unbound variable `{1}`")]
     UnboundVar(Span, Sym),
+
+    #[error("unknown type `{0}`")]
     UnknownType(Sym),
 }
 impl Error {
@@ -32,6 +34,7 @@ impl Error {
             Self::DuplicateParam(span, _) => *span,
             Self::DuplicateDecl(span, _) => *span,
             Self::UnboundVar(span, _) => *span,
+            Self::UnknownType(_) => todo!(),
         }
     }
 }
@@ -161,7 +164,7 @@ struct NameExprVisitor<'a> {
     errors: &'a mut Vec<Error>,
 }
 
-impl<'a> ExprVisitor for NameExprVisitor<'a> {
+impl<'a> ExprVisitorMut for NameExprVisitor<'a> {
     fn visit_var(&mut self, var: &mut Var) {
         if let Some(sym) = self.syms.get_var(&var.sym.name) {
             var.sym = *sym;
@@ -230,13 +233,13 @@ struct NameTypeVisitor<'a> {
 
 impl<'a> TypeVisitor for NameTypeVisitor<'a> {
     fn visit_named(&mut self, sym: &mut Sym) {
-        let decl = self
+        let decl_sym = self
             .syms
             .get_struct(&sym.name)
             .or_else(|| self.syms.get_enum(&sym.name));
 
-        if let Some(decl) = decl {
-            *sym = decl.sym();
+        if let Some(&decl_sym) = decl_sym {
+            *sym = decl_sym;
         } else {
             self.errors.push(Error::UnknownType(*sym));
         }

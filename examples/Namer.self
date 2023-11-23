@@ -11,7 +11,6 @@ struct Foo {
     bar: Bar
 }
 
-
 fn add(_ x: Int64, to y: Int64, now: Bool): (Int64, Bool) {
   let foo = now || false
   let a = Bar.abc(x)
@@ -21,3 +20,15 @@ fn add(_ x: Int64, to y: Int64, now: Bool): (Int64, Bool) {
   a + b + c.x
 }
 
+
+fn toto(): Bool {
+  tata(tutu())
+}
+
+fn tata(): Bool {
+  titi() || tutu()
+}
+
+fn tutu(): Bool {
+  tete() && tutu()
+}
