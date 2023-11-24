@@ -1,7 +1,10 @@
 //! Namer for the Selfie language
 
+#![feature(entry_insert)]
+
 use std::collections::HashSet;
 
+use scope::FnSym;
 use thiserror::Error;
 
 use selfie_ast::visitor::{ExprVisitorMut, TypeVisitor};
@@ -9,6 +12,9 @@ use selfie_ast::*;
 
 mod symbol_table;
 use symbol_table::SymbolTable;
+
+mod scope;
+pub use scope::Scope;
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -84,12 +90,23 @@ impl Namer {
                     .push(Error::DuplicateDecl(decl.span(), decl.sym()));
             }
 
-            self.syms.freshen(&mut decl.sym());
-            self.syms.add_decl(decl);
+            self.name_decl(decl);
         }
 
         for decl in &mut module.decls {
-            self.name_decl(decl);
+            match decl {
+                Decl::Fn(fn_decl) => {
+                    let fn_scope = self.syms.get_fn(&fn_decl.sym.name).unwrap();
+                    let mut expr_scope = Scope::default();
+                    for (param, sym) in &fn_scope.params {
+                        expr_scope.vars.insert(*param, *sym);
+                    }
+                    self.syms.push_scope(expr_scope);
+                    self.name_expr(&mut fn_decl.body);
+                }
+                Decl::Struct(struct_decl) => (),
+                Decl::Enum(enum_decl) => (),
+            }
         }
     }
 
@@ -102,7 +119,9 @@ impl Namer {
     }
 
     fn name_fn_decl(&mut self, fn_decl: &mut FnDecl) {
-        self.syms.push_scope();
+        self.syms.freshen(&mut fn_decl.sym);
+
+        let scope = self.syms.add_fn(fn_decl.sym);
 
         let mut params = HashSet::new();
         let mut aliases = HashSet::new();
@@ -117,18 +136,12 @@ impl Namer {
                 if !aliases.insert(sym) {
                     self.errors.push(Error::DuplicateParam(param.span(), sym));
                 }
+
+                scope.aliases.insert(sym.name, sym);
             }
 
-            self.name_param(param);
+            scope.params.insert(param.sym.name, param.sym);
         }
-
-        self.name_expr(&mut fn_decl.body);
-
-        self.syms.pop_scope();
-    }
-
-    fn name_param(&mut self, param: &mut Param) {
-        self.syms.add_var(param.sym);
     }
 
     fn name_expr(&mut self, expr: &mut Expr) {
@@ -194,7 +207,7 @@ impl<'a> ExprVisitorMut for NameExprVisitor<'a> {
     fn visit_let(&mut self, let_: &mut Let) {
         self.visit_expr(&mut let_.value);
 
-        self.syms.push_scope();
+        self.syms.push_new_scope();
 
         self.syms.freshen(&mut let_.sym);
         self.syms.add_var(let_.sym);
@@ -236,9 +249,10 @@ impl<'a> TypeVisitor for NameTypeVisitor<'a> {
         let decl_sym = self
             .syms
             .get_struct(&sym.name)
-            .or_else(|| self.syms.get_enum(&sym.name));
+            .map(|s| s.sym)
+            .or_else(|| self.syms.get_enum(&sym.name).map(|s| s.sym));
 
-        if let Some(&decl_sym) = decl_sym {
+        if let Some(decl_sym) = decl_sym {
             *sym = decl_sym;
         } else {
             self.errors.push(Error::UnknownType(*sym));

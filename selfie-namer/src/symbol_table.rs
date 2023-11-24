@@ -1,6 +1,7 @@
-use std::collections::HashMap;
-
 use selfie_ast::{Decl, Name, Sym};
+
+use crate::scope::{EnumSym, FnSym, StructSym};
+use crate::Scope;
 
 #[derive(Copy, Clone, Default, Debug)]
 pub struct Ids {
@@ -29,29 +30,40 @@ impl SymbolTable {
         }
     }
 
-    pub fn push_scope(&mut self) {
-        self.scopes.push(Scope::default());
+    pub fn push_new_scope(&mut self) -> &mut Scope {
+        self.push_scope(Scope::default())
     }
 
-    pub fn pop_scope(&mut self) {
+    pub fn push_scope(&mut self, scope: Scope) -> &mut Scope {
+        self.scopes.push(scope);
+        self.current_scope_mut()
+    }
+
+    pub fn pop_scope(&mut self) -> Scope {
+        debug_assert!(!self.scopes.is_empty());
+
         if self.scopes.len() == 1 {
             panic!("cannot pop root scope");
         }
 
-        self.scopes.pop();
+        self.scopes.pop().expect("we have at least one scope")
     }
 
     pub fn in_scope(&mut self, f: impl FnOnce(&mut Self)) {
-        self.push_scope();
+        self.push_new_scope();
         f(self);
         self.pop_scope();
     }
 
     pub fn current_scope(&self) -> &Scope {
+        debug_assert!(!self.scopes.is_empty());
+
         self.scopes.last().expect("no scopes")
     }
 
     pub fn current_scope_mut(&mut self) -> &mut Scope {
+        debug_assert!(!self.scopes.is_empty());
+
         self.scopes.last_mut().expect("no scopes")
     }
 
@@ -60,41 +72,43 @@ impl SymbolTable {
     }
 
     pub fn get_var(&self, name: &Name) -> Option<&Sym> {
-        for scope in self.scopes.iter().rev() {
-            if let Some(sym) = scope.get_var(name) {
-                return Some(sym);
-            }
-        }
-
-        None
+        self.scopes
+            .iter()
+            .rev()
+            .find_map(|scope| scope.get_var(name))
     }
 
     pub fn get_var_mut(&mut self, name: &Name) -> Option<&mut Sym> {
-        self.current_scope_mut().vars.get_mut(name)
+        self.current_scope_mut().get_var_mut(name)
     }
 
     pub fn add_decl(&mut self, decl: &Decl) {
         self.current_scope_mut().add_decl(decl);
     }
 
-    pub fn get_struct(&self, name: &Name) -> Option<&Sym> {
-        for scope in self.scopes.iter().rev() {
-            if let Some(sym) = scope.get_struct(name) {
-                return Some(sym);
-            }
-        }
-
-        None
+    pub fn add_fn(&mut self, sym: Sym) -> &mut FnSym {
+        self.current_scope_mut().add_fn(sym)
     }
 
-    pub fn get_enum(&self, name: &Name) -> Option<&Sym> {
-        for scope in self.scopes.iter().rev() {
-            if let Some(sym) = scope.get_enum(name) {
-                return Some(sym);
-            }
-        }
+    pub fn get_fn(&self, name: &Name) -> Option<&FnSym> {
+        self.scopes
+            .iter()
+            .rev()
+            .find_map(|scope| scope.get_fn(name))
+    }
 
-        None
+    pub fn get_struct(&self, name: &Name) -> Option<&StructSym> {
+        self.scopes
+            .iter()
+            .rev()
+            .find_map(|scope| scope.get_struct(name))
+    }
+
+    pub fn get_enum(&self, name: &Name) -> Option<&EnumSym> {
+        self.scopes
+            .iter()
+            .rev()
+            .find_map(|scope| scope.get_enum(name))
     }
 
     pub fn freshen(&mut self, sym: &mut Sym) {
@@ -102,68 +116,8 @@ impl SymbolTable {
     }
 }
 
-#[derive(Default, Debug)]
-pub struct Scope {
-    vars: HashMap<Name, Sym>,
-    fns: HashMap<Name, Sym>,
-    structs: HashMap<Name, Sym>,
-    enums: HashMap<Name, Sym>,
-}
-
-impl Scope {
-    pub fn add_var(&mut self, sym: Sym) {
-        self.vars.insert(sym.name, sym);
-    }
-
-    pub fn get_var(&self, name: &Name) -> Option<&Sym> {
-        self.vars.get(name)
-    }
-
-    pub fn get_var_mut(&mut self, name: &Name) -> Option<&mut Sym> {
-        self.vars.get_mut(name)
-    }
-
-    pub fn add_decl(&mut self, decl: &Decl) {
-        match decl {
-            Decl::Fn(decl) => self.add_fn(decl.sym),
-            Decl::Struct(decl) => self.add_struct(decl.sym),
-            Decl::Enum(decl) => self.add_enum(decl.sym),
-        }
-    }
-
-    pub fn add_fn(&mut self, sym: Sym) {
-        self.fns.insert(sym.name, sym);
-    }
-
-    pub fn get_fn(&self, name: &Name) -> Option<&Sym> {
-        self.fns.get(name)
-    }
-
-    pub fn get_fn_mut(&mut self, name: &Name) -> Option<&mut Sym> {
-        self.fns.get_mut(name)
-    }
-
-    pub fn add_struct(&mut self, sym: Sym) {
-        self.structs.insert(sym.name, sym);
-    }
-
-    pub fn get_struct(&self, name: &Name) -> Option<&Sym> {
-        self.structs.get(name)
-    }
-
-    pub fn get_struct_mut(&mut self, name: &Name) -> Option<&mut Sym> {
-        self.structs.get_mut(name)
-    }
-
-    pub fn add_enum(&mut self, sym: Sym) {
-        self.enums.insert(sym.name, sym);
-    }
-
-    pub fn get_enum(&self, name: &Name) -> Option<&Sym> {
-        self.enums.get(name)
-    }
-
-    pub fn get_enum_mut(&mut self, name: &Name) -> Option<&mut Sym> {
-        self.enums.get_mut(name)
+impl Default for SymbolTable {
+    fn default() -> Self {
+        Self::new()
     }
 }
