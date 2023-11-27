@@ -1,18 +1,18 @@
-use selfie_ast::{Decl, Name, Sym};
+use std::sync::atomic::AtomicU32;
+
+use selfie_ast::{Name, Sym};
 
 use crate::scope::{EnumSym, FnSym, StructSym};
 use crate::Scope;
 
-#[derive(Copy, Clone, Default, Debug)]
+#[derive(Default, Debug)]
 pub struct Ids {
-    next: u32,
+    next: AtomicU32,
 }
 
 impl Ids {
-    pub fn next(&mut self) -> u32 {
-        let id = self.next;
-        self.next += 1;
-        id
+    pub fn next(&self) -> u32 {
+        self.next.fetch_add(1, std::sync::atomic::Ordering::SeqCst)
     }
 }
 
@@ -82,12 +82,8 @@ impl SymbolTable {
         self.current_scope_mut().get_var_mut(name)
     }
 
-    pub fn add_decl(&mut self, decl: &Decl) {
-        self.current_scope_mut().add_decl(decl);
-    }
-
-    pub fn add_fn(&mut self, sym: Sym) -> &mut FnSym {
-        self.current_scope_mut().add_fn(sym)
+    pub fn add_fn(&mut self, fn_sym: FnSym) {
+        self.current_scope_mut().add_fn(fn_sym)
     }
 
     pub fn get_fn(&self, name: &Name) -> Option<&FnSym> {
@@ -111,7 +107,7 @@ impl SymbolTable {
             .find_map(|scope| scope.get_enum(name))
     }
 
-    pub fn freshen(&mut self, sym: &mut Sym) {
+    pub fn freshen(&self, sym: &mut Sym) {
         sym.id = self.ids.next();
     }
 }

@@ -1,24 +1,35 @@
 use std::collections::HashMap;
 
-use selfie_ast::{Decl, Name, Sym};
+use indexmap::IndexMap;
+use selfie_ast::{Name, ParamKind, Sym};
 
 #[derive(Debug)]
 pub struct FnSym {
     pub sym: Sym,
-    pub params: HashMap<Name, Sym>,
-    pub aliases: HashMap<Name, Sym>,
+    pub params: IndexMap<Name, (Sym, ParamKind)>,
+    pub aliases: IndexMap<Name, Sym>,
+}
+
+impl FnSym {
+    pub fn new(sym: Sym) -> Self {
+        Self {
+            sym,
+            params: IndexMap::new(),
+            aliases: IndexMap::new(),
+        }
+    }
 }
 
 #[derive(Debug)]
 pub struct StructSym {
     pub sym: Sym,
-    pub fields: HashMap<Name, Sym>,
+    pub fields: IndexMap<Name, Sym>,
 }
 
 #[derive(Debug)]
 pub struct EnumSym {
     pub sym: Sym,
-    pub variants: HashMap<Name, Sym>,
+    pub variants: IndexMap<Name, Sym>,
 }
 
 #[derive(Default, Debug)]
@@ -42,29 +53,8 @@ impl Scope {
         self.vars.get_mut(name)
     }
 
-    pub fn add_decl(&mut self, decl: &Decl) {
-        match decl {
-            Decl::Fn(decl) => {
-                self.add_fn(decl.sym);
-            }
-            Decl::Struct(decl) => {
-                self.add_struct(decl.sym);
-            }
-            Decl::Enum(decl) => {
-                self.add_enum(decl.sym);
-            }
-        }
-    }
-
-    pub fn add_fn(&mut self, sym: Sym) -> &mut FnSym {
-        let fn_sym = FnSym {
-            sym,
-            params: HashMap::new(),
-            aliases: HashMap::new(),
-        };
-
-        self.fns.insert(sym.name, fn_sym);
-        self.fns.get_mut(&sym.name).unwrap()
+    pub fn add_fn(&mut self, fn_sym: FnSym) {
+        self.fns.insert(fn_sym.sym.name, fn_sym);
     }
 
     pub fn get_fn(&self, name: &Name) -> Option<&FnSym> {
@@ -78,7 +68,7 @@ impl Scope {
     pub fn add_struct(&mut self, sym: Sym) -> &mut StructSym {
         let struct_sym = StructSym {
             sym,
-            fields: HashMap::new(),
+            fields: IndexMap::new(),
         };
 
         self.structs.insert(sym.name, struct_sym);
@@ -96,7 +86,7 @@ impl Scope {
     pub fn add_enum(&mut self, sym: Sym) -> &mut EnumSym {
         let enum_sym = EnumSym {
             sym,
-            variants: HashMap::new(),
+            variants: IndexMap::new(),
         };
 
         self.enums.insert(sym.name, enum_sym);

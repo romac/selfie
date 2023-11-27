@@ -1,50 +1,19 @@
 //! Namer for the Selfie language
 
-#![feature(entry_insert)]
-
 use std::collections::HashSet;
 
-use thiserror::Error;
-
+use scope::FnSym;
 use selfie_ast::visitor::{ExprVisitorMut, TypeVisitorMut};
 use selfie_ast::*;
+
+mod error;
+pub use error::Error;
 
 mod symbol_table;
 use symbol_table::SymbolTable;
 
 mod scope;
 pub use scope::Scope;
-
-use scope::FnSym;
-
-#[derive(Debug, Error)]
-pub enum Error {
-    #[error("duplicate module `{1}`")]
-    DuplicateModule(Span, Sym),
-
-    #[error("duplicate param `{1}`")]
-    DuplicateParam(Span, Sym),
-
-    #[error("duplicate declaration `{1}`")]
-    DuplicateDecl(Span, Sym),
-
-    #[error("unbound variable `{1}`")]
-    UnboundVar(Span, Sym),
-
-    #[error("unknown type `{0}`")]
-    UnknownType(Sym),
-}
-impl Error {
-    pub fn span(&self) -> Span {
-        match self {
-            Self::DuplicateModule(span, _) => *span,
-            Self::DuplicateParam(span, _) => *span,
-            Self::DuplicateDecl(span, _) => *span,
-            Self::UnboundVar(span, _) => *span,
-            Self::UnknownType(_) => todo!(),
-        }
-    }
-}
 
 #[derive(Debug)]
 pub struct Namer {
@@ -91,57 +60,85 @@ impl Namer {
                     .push(Error::DuplicateDecl(decl.span(), decl.sym()));
             }
 
-            self.name_decl(decl);
+            self.name_decl_sig(decl);
         }
 
         for decl in &mut module.decls {
-            match decl {
-                Decl::Fn(fn_decl) => {
-                    let fn_scope = self.syms.get_fn(&fn_decl.sym.name).unwrap();
-                    let mut expr_scope = Scope::default();
-                    for (param, sym) in &fn_scope.params {
-                        expr_scope.vars.insert(*param, *sym);
-                    }
-                    self.syms.push_scope(expr_scope);
-                    self.name_expr(&mut fn_decl.body);
-                }
-                Decl::Struct(struct_decl) => (),
-                Decl::Enum(enum_decl) => (),
+            if let Decl::Fn(fn_decl) = decl {
+                self.name_fn_body(fn_decl)
             }
         }
     }
 
-    fn name_decl(&mut self, decl: &mut Decl) {
+    fn name_fn_body(&mut self, fn_decl: &mut FnDecl) {
+        let fn_scope = self.syms.get_fn(&fn_decl.sym.name).unwrap();
+
+        let mut expr_scope = Scope::default();
+        for (param, (sym, _)) in &fn_scope.params {
+            expr_scope.vars.insert(*param, *sym);
+        }
+        self.syms.push_scope(expr_scope);
+
+        self.name_expr(&mut fn_decl.body);
+    }
+
+    fn name_decl_sig(&mut self, decl: &mut Decl) {
         match decl {
-            Decl::Fn(fn_decl) => self.name_fn_decl(fn_decl),
+            Decl::Fn(fn_decl) => self.name_fn_decl_sig(fn_decl),
             Decl::Struct(struct_decl) => self.name_struct_decl(struct_decl),
             Decl::Enum(enum_decl) => self.name_enum_decl(enum_decl),
         }
     }
 
-    fn name_fn_decl(&mut self, fn_decl: &mut FnDecl) {
+    fn name_fn_decl_sig(&mut self, fn_decl: &mut FnDecl) {
         self.syms.freshen(&mut fn_decl.sym);
 
-        let scope = self.syms.add_fn(fn_decl.sym);
+        let mut fn_sym = FnSym::new(fn_decl.sym);
 
         let mut params = HashSet::new();
         let mut aliases = HashSet::new();
 
         for param in &mut fn_decl.params {
+            self.syms.freshen(&mut param.sym);
+
             if !params.insert(param.sym) {
                 self.errors
                     .push(Error::DuplicateParam(param.span(), param.sym));
             }
 
-            if let ParamKind::Alias(sym) = param.kind {
-                if !aliases.insert(sym) {
-                    self.errors.push(Error::DuplicateParam(param.span(), sym));
+            let span = param.span;
+
+            if let ParamKind::Alias(sym) = &mut param.kind {
+                self.syms.freshen(sym);
+
+                if !aliases.insert(*sym) {
+                    self.errors.push(Error::DuplicateParam(span, *sym));
                 }
 
-                scope.aliases.insert(sym.name, sym);
+                fn_sym.aliases.insert(sym.name, *sym);
             }
 
-            scope.params.insert(param.sym.name, param.sym);
+            fn_sym
+                .params
+                .insert(param.sym.name, (param.sym, param.kind));
+        }
+
+        self.syms.add_fn(fn_sym);
+    }
+
+    fn name_struct_decl(&mut self, struct_decl: &mut StructDecl) {
+        self.syms.freshen(&mut struct_decl.sym);
+
+        for field in &mut struct_decl.fields {
+            self.syms.freshen(&mut field.sym);
+        }
+    }
+
+    fn name_enum_decl(&mut self, enum_decl: &mut EnumDecl) {
+        self.syms.freshen(&mut enum_decl.sym);
+
+        for variant in &mut enum_decl.variants {
+            self.syms.freshen(&mut variant.sym);
         }
     }
 
@@ -152,18 +149,6 @@ impl Namer {
         };
 
         visitor.visit_expr(expr);
-    }
-
-    fn name_struct_decl(&mut self, struct_decl: &mut StructDecl) {
-        for field in &mut struct_decl.fields {
-            self.syms.freshen(&mut field.sym);
-        }
-    }
-
-    fn name_enum_decl(&mut self, enum_decl: &mut EnumDecl) {
-        for variant in &mut enum_decl.variants {
-            self.syms.freshen(&mut variant.sym);
-        }
     }
 }
 
@@ -188,6 +173,58 @@ impl<'a> ExprVisitorMut for NameExprVisitor<'a> {
     }
 
     fn visit_fn_call(&mut self, call: &mut FnCall) {
+        match self.syms.get_fn(&call.sym.name) {
+            None => {
+                self.errors.push(Error::UnboundFn(call.span, call.sym));
+            }
+
+            Some(fn_sym) => {
+                call.sym = fn_sym.sym;
+
+                if call.args.len() != fn_sym.params.len() {
+                    self.errors.push(Error::WrongArgCount(
+                        call.span,
+                        call.sym,
+                        call.args.len(),
+                        fn_sym.params.len(),
+                    ));
+
+                    return;
+                }
+
+                let zipped = call.args.iter_mut().zip(fn_sym.params.values());
+
+                for (arg, (param, kind)) in zipped {
+                    match (arg, kind) {
+                        (Arg::Named(arg), ParamKind::Anon) => {
+                            self.errors
+                                .push(Error::ExtraneousArgLabel(arg.span(), arg.sym, *param));
+                        }
+
+                        (Arg::Anon(arg), ParamKind::Normal | ParamKind::Alias(_)) => {
+                            self.errors.push(Error::MissingArgLabel(arg.span(), *param));
+                        }
+
+                        (Arg::Anon(_), ParamKind::Anon) => {
+                            // All good
+                        }
+
+                        (Arg::Named(named), ParamKind::Normal | ParamKind::Alias(_)) => {
+                            if named.sym.name != param.name {
+                                self.errors.push(Error::UnexpectedArg(
+                                    named.span(),
+                                    named.sym,
+                                    *param,
+                                ));
+                            } else {
+                                named.sym = *param;
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
         for arg in &mut call.args {
             match arg {
                 Arg::Named(named) => self.visit_expr(&mut named.value),
@@ -232,7 +269,7 @@ impl<'a> ExprVisitorMut for NameExprVisitor<'a> {
     }
 
     fn visit_enum_init(&mut self, init: &mut EnumInit) {
-        // TODO: Check that variant exists
+        // TODO: Check that type and variant exists
 
         if let Some(arg) = &mut init.arg {
             self.visit_expr(arg);

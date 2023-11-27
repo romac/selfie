@@ -25,10 +25,18 @@ fn toto(): Bool {
   tata(tutu())
 }
 
-fn tata(): Bool {
+fn tata(_ x: Bool): Bool {
   titi() || tutu()
 }
 
 fn tutu(): Bool {
   tete() && tutu()
+}
+
+fn titi(): Bool {
+  true
+}
+
+fn tete(): Bool {
+  true
 }
