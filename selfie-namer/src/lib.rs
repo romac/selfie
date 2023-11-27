@@ -4,10 +4,9 @@
 
 use std::collections::HashSet;
 
-use scope::FnSym;
 use thiserror::Error;
 
-use selfie_ast::visitor::{ExprVisitorMut, TypeVisitor};
+use selfie_ast::visitor::{ExprVisitorMut, TypeVisitorMut};
 use selfie_ast::*;
 
 mod symbol_table;
@@ -15,6 +14,8 @@ use symbol_table::SymbolTable;
 
 mod scope;
 pub use scope::Scope;
+
+use scope::FnSym;
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -244,7 +245,7 @@ struct NameTypeVisitor<'a> {
     errors: &'a mut Vec<Error>,
 }
 
-impl<'a> TypeVisitor for NameTypeVisitor<'a> {
+impl<'a> TypeVisitorMut for NameTypeVisitor<'a> {
     fn visit_named(&mut self, sym: &mut Sym) {
         let decl_sym = self
             .syms
