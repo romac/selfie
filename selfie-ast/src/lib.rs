@@ -214,14 +214,14 @@ pub struct If {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct StructInit {
     pub span: Span,
-    pub id: Sym,
+    pub sym: Sym,
     pub args: Vec<NamedArg>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct EnumInit {
     pub span: Span,
-    pub id: Option<Sym>,
+    pub sym: Option<Sym>,
     pub variant: Sym,
     pub arg: Option<Box<Expr>>,
 }

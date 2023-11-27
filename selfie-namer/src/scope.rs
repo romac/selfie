@@ -26,10 +26,28 @@ pub struct StructSym {
     pub fields: IndexMap<Name, Sym>,
 }
 
+impl StructSym {
+    pub fn new(sym: Sym) -> Self {
+        Self {
+            sym,
+            fields: IndexMap::new(),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct EnumSym {
     pub sym: Sym,
     pub variants: IndexMap<Name, Sym>,
+}
+
+impl EnumSym {
+    pub fn new(sym: Sym) -> Self {
+        Self {
+            sym,
+            variants: IndexMap::new(),
+        }
+    }
 }
 
 #[derive(Default, Debug)]
@@ -65,14 +83,8 @@ impl Scope {
         self.fns.get_mut(name)
     }
 
-    pub fn add_struct(&mut self, sym: Sym) -> &mut StructSym {
-        let struct_sym = StructSym {
-            sym,
-            fields: IndexMap::new(),
-        };
-
-        self.structs.insert(sym.name, struct_sym);
-        self.structs.get_mut(&sym.name).unwrap()
+    pub fn add_struct(&mut self, struct_sym: StructSym) {
+        self.structs.insert(struct_sym.sym.name, struct_sym);
     }
 
     pub fn get_struct(&self, name: &Name) -> Option<&StructSym> {
@@ -83,14 +95,8 @@ impl Scope {
         self.structs.get_mut(name)
     }
 
-    pub fn add_enum(&mut self, sym: Sym) -> &mut EnumSym {
-        let enum_sym = EnumSym {
-            sym,
-            variants: IndexMap::new(),
-        };
-
-        self.enums.insert(sym.name, enum_sym);
-        self.enums.get_mut(&sym.name).unwrap()
+    pub fn add_enum(&mut self, enum_sym: EnumSym) {
+        self.enums.insert(enum_sym.sym.name, enum_sym);
     }
 
     pub fn get_enum(&self, name: &Name) -> Option<&EnumSym> {

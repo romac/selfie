@@ -2,7 +2,7 @@
 
 use std::collections::HashSet;
 
-use scope::FnSym;
+use scope::{EnumSym, FnSym, StructSym};
 use selfie_ast::visitor::{ExprVisitorMut, TypeVisitorMut};
 use selfie_ast::*;
 
@@ -95,32 +95,27 @@ impl Namer {
 
         let mut fn_sym = FnSym::new(fn_decl.sym);
 
-        let mut params = HashSet::new();
-        let mut aliases = HashSet::new();
-
         for param in &mut fn_decl.params {
             self.syms.freshen(&mut param.sym);
-
-            if !params.insert(param.sym) {
-                self.errors
-                    .push(Error::DuplicateParam(param.span(), param.sym));
-            }
 
             let span = param.span;
 
             if let ParamKind::Alias(sym) = &mut param.kind {
                 self.syms.freshen(sym);
 
-                if !aliases.insert(*sym) {
+                if fn_sym.aliases.insert(sym.name, *sym).is_some() {
                     self.errors.push(Error::DuplicateParam(span, *sym));
                 }
-
-                fn_sym.aliases.insert(sym.name, *sym);
             }
 
-            fn_sym
+            if fn_sym
                 .params
-                .insert(param.sym.name, (param.sym, param.kind));
+                .insert(param.sym.name, (param.sym, param.kind))
+                .is_some()
+            {
+                self.errors
+                    .push(Error::DuplicateParam(param.span(), param.sym));
+            }
         }
 
         self.syms.add_fn(fn_sym);
@@ -129,17 +124,53 @@ impl Namer {
     fn name_struct_decl(&mut self, struct_decl: &mut StructDecl) {
         self.syms.freshen(&mut struct_decl.sym);
 
+        let mut struct_sym = StructSym::new(struct_decl.sym);
+
         for field in &mut struct_decl.fields {
             self.syms.freshen(&mut field.sym);
+
+            let duplicate = struct_sym
+                .fields
+                .insert(field.sym.name, field.sym)
+                .is_some();
+
+            if duplicate {
+                self.errors
+                    .push(Error::DuplicateField(field.span(), field.sym));
+            }
+
+            // TODO: Handle recursive types
+            self.name_type(&mut field.ty);
         }
+
+        self.syms.add_struct(struct_sym);
     }
 
     fn name_enum_decl(&mut self, enum_decl: &mut EnumDecl) {
         self.syms.freshen(&mut enum_decl.sym);
 
+        let mut enum_sym = EnumSym::new(enum_decl.sym);
+
         for variant in &mut enum_decl.variants {
             self.syms.freshen(&mut variant.sym);
+
+            let duplicate = enum_sym
+                .variants
+                .insert(variant.sym.name, variant.sym)
+                .is_some();
+
+            if duplicate {
+                self.errors
+                    .push(Error::DuplicateVariant(variant.span(), variant.sym));
+            }
+
+            // TODO: Handle recursive types
+            if let Some(ty) = &mut variant.ty {
+                self.name_type(ty);
+            }
         }
+
+        self.syms.add_enum(enum_sym);
     }
 
     fn name_expr(&mut self, expr: &mut Expr) {
@@ -150,6 +181,8 @@ impl Namer {
 
         visitor.visit_expr(expr);
     }
+
+    fn name_type(&self, _ty: &mut Type) {}
 }
 
 impl Default for Namer {
@@ -210,14 +243,14 @@ impl<'a> ExprVisitorMut for NameExprVisitor<'a> {
                         }
 
                         (Arg::Named(named), ParamKind::Normal | ParamKind::Alias(_)) => {
-                            if named.sym.name != param.name {
+                            if named.sym.name == param.name {
+                                named.sym = *param;
+                            } else {
                                 self.errors.push(Error::UnexpectedArg(
                                     named.span(),
                                     named.sym,
                                     *param,
                                 ));
-                            } else {
-                                named.sym = *param;
                             }
                         }
                     }
@@ -233,13 +266,8 @@ impl<'a> ExprVisitorMut for NameExprVisitor<'a> {
         }
     }
 
-    fn visit_method_call(&mut self, call: &mut MethodCall) {
-        for arg in &mut call.args {
-            match arg {
-                Arg::Named(named) => self.visit_expr(&mut named.value),
-                Arg::Anon(expr) => self.visit_expr(expr),
-            }
-        }
+    fn visit_method_call(&mut self, _call: &mut MethodCall) {
+        todo!()
     }
 
     fn visit_let(&mut self, let_: &mut Let) {
@@ -261,15 +289,65 @@ impl<'a> ExprVisitorMut for NameExprVisitor<'a> {
     }
 
     fn visit_struct_init(&mut self, init: &mut StructInit) {
-        for arg in &mut init.args {
-            // TODO: Check that field exist
+        match self.syms.get_struct(&init.sym.name) {
+            None => {
+                self.errors.push(Error::UnknownType(init.sym));
+            }
 
+            Some(struct_sym) => {
+                init.sym = struct_sym.sym;
+
+                if init.args.len() != struct_sym.fields.len() {
+                    // TODO: Use bespoke error
+                    self.errors.push(Error::WrongArgCount(
+                        init.span,
+                        init.sym,
+                        init.args.len(),
+                        struct_sym.fields.len(),
+                    ));
+
+                    return;
+                }
+
+                // TODO: Allow fields in any order?
+                let zipped = init.args.iter_mut().zip(struct_sym.fields.values());
+
+                for (arg, sym) in zipped {
+                    if arg.sym.name == sym.name {
+                        arg.sym = *sym;
+                    } else {
+                        self.errors
+                            .push(Error::UnexpectedArg(arg.span, arg.sym, *sym));
+                    }
+                }
+            }
+        }
+
+        for arg in &mut init.args {
             self.visit_expr(&mut arg.value);
         }
     }
 
     fn visit_enum_init(&mut self, init: &mut EnumInit) {
-        // TODO: Check that type and variant exists
+        // TODO: Handle anonymous variants
+        let sym = init.sym.unwrap();
+
+        match self.syms.get_enum(&sym.name) {
+            None => {
+                self.errors.push(Error::UnknownType(sym));
+            }
+
+            Some(enum_sym) => {
+                init.sym = Some(enum_sym.sym);
+
+                if let Some(variant_sym) = enum_sym.variants.get(&init.variant.name) {
+                    init.variant = *variant_sym;
+                } else {
+                    self.errors
+                        .push(Error::UnknownVariant(init.span(), init.variant));
+                }
+            }
+        }
 
         if let Some(arg) = &mut init.arg {
             self.visit_expr(arg);

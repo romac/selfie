@@ -93,11 +93,19 @@ impl SymbolTable {
             .find_map(|scope| scope.get_fn(name))
     }
 
+    pub fn add_struct(&mut self, struct_sym: StructSym) {
+        self.current_scope_mut().add_struct(struct_sym)
+    }
+
     pub fn get_struct(&self, name: &Name) -> Option<&StructSym> {
         self.scopes
             .iter()
             .rev()
             .find_map(|scope| scope.get_struct(name))
+    }
+
+    pub fn add_enum(&mut self, enum_sym: EnumSym) {
+        self.current_scope_mut().add_enum(enum_sym)
     }
 
     pub fn get_enum(&self, name: &Name) -> Option<&EnumSym> {

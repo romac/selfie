@@ -21,10 +21,10 @@ pub enum Error {
     #[error("unknown type `{0}`")]
     UnknownType(Sym),
 
-    #[error("unexpected argument `{2}`, expected `{1}`")]
+    #[error("unexpected argument `{1}`, expected `{2}`")]
     UnexpectedArg(Span, Sym, Sym),
 
-    #[error("wrong number of arguments for `{1}`, expected `{2}`, found `{3}`")]
+    #[error("wrong number of arguments for `{1}`: expected {2}, found {3}")]
     WrongArgCount(Span, Sym, usize, usize),
 
     #[error("extraneous argument label `{1}` for anonymous parameter `{2}`")]
@@ -32,6 +32,15 @@ pub enum Error {
 
     #[error("missing argument label for parameter `{1}`")]
     MissingArgLabel(Span, Sym),
+
+    #[error("duplicate field `{1}`")]
+    DuplicateField(Span, Sym),
+
+    #[error("duplicate variant `{1}`")]
+    DuplicateVariant(Span, Sym),
+
+    #[error("unknown variant `{1}`")]
+    UnknownVariant(Span, Sym),
 }
 
 impl Error {
@@ -47,6 +56,9 @@ impl Error {
             Self::WrongArgCount(span, _, _, _) => *span,
             Self::ExtraneousArgLabel(span, _, _) => *span,
             Self::MissingArgLabel(span, _) => *span,
+            Self::DuplicateField(span, _) => *span,
+            Self::DuplicateVariant(span, _) => *span,
+            Self::UnknownVariant(span, _) => *span,
         }
     }
 }

@@ -20,7 +20,6 @@ fn add(_ x: Int64, to y: Int64, now: Bool): (Int64, Bool) {
   a + b + c.x
 }
 
-
 fn toto(): Bool {
   tata(tutu())
 }

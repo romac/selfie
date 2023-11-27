@@ -383,7 +383,7 @@ pub fn parse_struct_init(expr: impl Parser<Expr>) -> impl Parser<StructInit> {
     parse_upper()
         .then(parens(args))
         .map_with(|(id, args), meta| StructInit {
-            id,
+            sym: id,
             args,
             span: meta.span(),
         })
@@ -420,7 +420,7 @@ pub fn parse_enum_init(expr: impl Parser<Expr>) -> impl Parser<EnumInit> {
         .then(parse_lower())
         .then(parens(expr.map(Box::new)).or_not())
         .map_with(|((id, variant), arg), meta| EnumInit {
-            id,
+            sym: id,
             variant,
             arg,
             span: meta.span(),
