@@ -93,9 +93,9 @@ impl Error {
             Self::UnknownVariant(_, enum_sym, _) => {
                 Some(format!("available variants: {}", show_variants(enum_sym)))
             }
-            Self::WrongArgLabel(_, _, arg, alias) => {
-                Some(format!("parameter `{arg}` exists but is aliased as `{alias}`"))
-            }
+            Self::WrongArgLabel(_, _, arg, alias) => Some(format!(
+                "parameter `{arg}` exists but is aliased as `{alias}`"
+            )),
             _ => None,
         }
     }

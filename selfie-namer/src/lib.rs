@@ -240,8 +240,11 @@ impl<'a> ExprVisitorMut for NameExprVisitor<'a> {
                         }
 
                         (Arg::Anon(arg), ParamKind::Normal | ParamKind::Alias(_)) => {
-                            self.errors
-                                .push(Error::MissingArgLabel(arg.span(), fn_sym.clone(), *param));
+                            self.errors.push(Error::MissingArgLabel(
+                                arg.span(),
+                                fn_sym.clone(),
+                                *param,
+                            ));
                         }
 
                         (Arg::Anon(_), ParamKind::Anon) => {
@@ -327,8 +330,11 @@ impl<'a> ExprVisitorMut for NameExprVisitor<'a> {
 
                 for field in struct_sym.fields.keys() {
                     if !init.args.iter().any(|arg| &arg.sym.name == field) {
-                        self.errors
-                            .push(Error::MissingField(init.span(), struct_sym.clone(), *field));
+                        self.errors.push(Error::MissingField(
+                            init.span(),
+                            struct_sym.clone(),
+                            *field,
+                        ));
                     }
                 }
 
@@ -336,8 +342,11 @@ impl<'a> ExprVisitorMut for NameExprVisitor<'a> {
                     if let Some(sym) = struct_sym.fields.get(&arg.sym.name) {
                         arg.sym = *sym;
                     } else {
-                        self.errors
-                            .push(Error::UnknownField(arg.span, struct_sym.clone(), arg.sym));
+                        self.errors.push(Error::UnknownField(
+                            arg.span,
+                            struct_sym.clone(),
+                            arg.sym,
+                        ));
                     }
                 }
             }
@@ -364,8 +373,11 @@ impl<'a> ExprVisitorMut for NameExprVisitor<'a> {
                 if let Some(variant_sym) = enum_sym.variants.get(&init.variant.name) {
                     init.variant = *variant_sym;
                 } else {
-                    self.errors
-                        .push(Error::UnknownVariant(init.span(), enum_sym.clone(), init.variant));
+                    self.errors.push(Error::UnknownVariant(
+                        init.span(),
+                        enum_sym.clone(),
+                        init.variant,
+                    ));
                 }
             }
         }

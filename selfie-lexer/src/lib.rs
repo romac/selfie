@@ -265,7 +265,10 @@ pub fn lex(input: &str) -> Result<Vec<(Token, Span)>, Error> {
             Ok(token) => tokens.push((token, lexer.span())),
 
             Err(Error::Other) => {
-                return Err(Error::UnexpectedToken(lexer.span(), Ustr::from(lexer.slice())));
+                return Err(Error::UnexpectedToken(
+                    lexer.span(),
+                    Ustr::from(lexer.slice()),
+                ));
             }
 
             Err(err) => return Err(err),

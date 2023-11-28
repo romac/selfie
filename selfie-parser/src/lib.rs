@@ -326,14 +326,12 @@ pub fn parse_field_access_or_method_call(
                 expr: Box::new(expr),
                 sym,
             }),
-            MF::MethodCall(sym, args, span) => {
-                Expr::MethodCall(MethodCall {
-                    span: expr.span().union(span),
-                    expr: Box::new(expr),
-                    sym,
-                    args,
-                })
-            }
+            MF::MethodCall(sym, args, span) => Expr::MethodCall(MethodCall {
+                span: expr.span().union(span),
+                expr: Box::new(expr),
+                sym,
+                args,
+            }),
         },
     )
 }
