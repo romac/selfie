@@ -52,10 +52,6 @@ pub enum Error {
     UnknownField(Span, StructSym, Sym),
 }
 
-fn show_args(fn_sym: &FnSym) -> String {
-    fn_sym.params.keys().join(", ")
-}
-
 fn show_variants(enum_sym: &EnumSym) -> String {
     enum_sym.variants.keys().join(", ")
 }
