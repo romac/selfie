@@ -25,13 +25,13 @@ fn take_while_m_n<'a>(
     m: usize,
     n: usize,
     f: impl Fn(char) -> bool,
-) -> impl Parser<'a, &'a str, String> {
+) -> impl Parser<'a, &'a str, &'a str> {
     any()
         .filter(move |&c| f(c))
         .repeated()
         .at_least(m)
         .at_most(n)
-        .collect::<String>()
+        .map_with(|_, meta| meta.slice())
 }
 
 /// Parse a unicode sequence, of the form u{XXXX}, where XXXX is 1 to 6
@@ -48,7 +48,7 @@ fn parse_unicode<'a>() -> impl Parser<'a, &'a str, char> {
     // a Result. In this case we take the hex bytes from parse_hex and attempt to
     // convert them to a u32.
     let parse_u32 = parse_delimited_hex
-        .try_map(move |hex, _| u32::from_str_radix(&hex, 16).map_err(|_| EmptyErr::default()));
+        .try_map(move |hex, _| u32::from_str_radix(hex, 16).map_err(|_| EmptyErr::default()));
 
     // map_opt is like map_res, but it takes an Option instead of a Result. If
     // the function returns None, map_opt returns an error. In this case, because
@@ -90,27 +90,27 @@ fn parse_escaped_whitespace<'a>() -> impl Parser<'a, &'a str, ()> {
 }
 
 /// Parse a non-empty block of text that doesn't include \ or "
-fn parse_literal<'a>() -> impl Parser<'a, &'a str, String> {
+fn parse_literal<'a>() -> impl Parser<'a, &'a str, &'a str> {
     any()
         .filter(|&c| c != '"' && c != '\\')
         .repeated()
         .at_least(1)
-        .collect::<String>()
+        .map_with(|_, meta| meta.slice())
 }
 
 /// A string fragment contains a fragment of a string being parsed: either
 /// a non-empty Literal (a series of non-escaped characters), a single
 /// parsed escaped character, or a block of escaped whitespace.
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum StringFragment {
-    Literal(String),
+enum StringFragment<'a> {
+    Literal(&'a str),
     EscapedChar(char),
     EscapedWS,
 }
 
 /// Combine parse_literal, parse_escaped_whitespace, and parse_escaped_char
 /// into a StringFragment.
-fn parse_fragment<'a>() -> impl Parser<'a, &'a str, StringFragment> {
+fn parse_fragment<'a>() -> impl Parser<'a, &'a str, StringFragment<'a>> {
     choice((
         // The `map` combinator runs a parser, then applies a function to the output
         // of that parser.
@@ -131,7 +131,7 @@ pub fn parse_string<'a>() -> impl Parser<'a, &'a str, String> {
         // string.
         |mut string, fragment| {
             match fragment {
-                StringFragment::Literal(s) => string.push_str(&s),
+                StringFragment::Literal(s) => string.push_str(s),
                 StringFragment::EscapedChar(c) => string.push(c),
                 StringFragment::EscapedWS => {}
             }
