@@ -21,7 +21,11 @@ fn add(_ x: Int64, to y: Int64, now: Bool): (Int64, Bool) {
 }
 
 fn toto(): Bool {
-  tata(tutu())
+  if tete() {
+    tata(tutu())
+  } else {
+    !tutu()
+  }
 }
 
 fn tata(_ x: Bool): Bool {

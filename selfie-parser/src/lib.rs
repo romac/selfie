@@ -276,6 +276,7 @@ pub fn parse_atom(expr: impl Parser<Expr>) -> impl Parser<Expr> {
         parse_fn_call(expr.clone()).map(Expr::FnCall),
         parse_struct_init(expr.clone()).map(Expr::StructInit),
         parse_enum_init(expr.clone()).map(Expr::EnumInit),
+        parse_if(expr.clone()).map(Expr::If),
         parse_let(expr.clone()).map(Expr::Let),
         parse_tuple(expr.clone()).map(Expr::Tuple),
         parens(expr.clone()),
@@ -343,6 +344,20 @@ pub fn parse_fn_call(expr: impl Parser<Expr>) -> impl Parser<FnCall> {
         .map_with(|(sym, args), meta| FnCall {
             sym,
             args,
+            span: meta.span(),
+        })
+}
+
+pub fn parse_if(expr: impl Parser<Expr>) -> impl Parser<If> {
+    just(Token::If)
+        .ignore_then(expr.clone())
+        .then(braces(expr.clone()))
+        .then_ignore(just(Token::Else))
+        .then(braces(expr.clone()))
+        .map_with(|((cnd, thn), els), meta| If {
+            cnd: Box::new(cnd),
+            thn: Box::new(thn),
+            els: Box::new(els),
             span: meta.span(),
         })
 }
