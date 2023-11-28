@@ -11,6 +11,10 @@ struct Foo {
     bar: Bar
 }
 
+fn callAdd(): Unit {
+  add(1, to: 2, now: true)
+}
+
 fn add(_ x: Int64, to y: Int64, now: Bool): (Int64, Bool) {
   let foo = now || false
   let a = Bar.abc(x)
@@ -41,5 +45,5 @@ fn titi(): Bool {
 }
 
 fn tete(): Bool {
-  true
+  false
 }

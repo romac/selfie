@@ -12,6 +12,12 @@ struct Foo {
     z: String
 }
 
+fn callAddBad(): Unit {
+  let a = addBad(x: 12, to: 42, now: true)
+  let b = addBad(12, y: 42, now: false)
+  a + b
+}
+
 fn addBad(_ x: Int64, to y: Int64, now: Bool): (Int64, Bool) {
   let foo = now || false
   let a = Bar.cat(x)

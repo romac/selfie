@@ -50,6 +50,9 @@ pub enum Error {
 
     #[error("unknown field `{2}`")]
     UnknownField(Span, StructSym, Sym),
+
+    #[error("wrong argument label for `{2}`, expected `{3}`")]
+    WrongArgLabel(Span, FnSym, Sym, Sym),
 }
 
 fn show_variants(enum_sym: &EnumSym) -> String {
@@ -78,6 +81,7 @@ impl Error {
             Self::UnknownVariant(span, _, _) => *span,
             Self::MissingField(span, _, _) => *span,
             Self::UnknownField(span, _, _) => *span,
+            Self::WrongArgLabel(span, _, _, _) => *span,
         }
     }
 
@@ -88,6 +92,9 @@ impl Error {
             }
             Self::UnknownVariant(_, enum_sym, _) => {
                 Some(format!("available variants: {}", show_variants(enum_sym)))
+            }
+            Self::WrongArgLabel(_, _, arg, alias) => {
+                Some(format!("parameter `{arg}` exists but is aliased as `{alias}`"))
             }
             _ => None,
         }

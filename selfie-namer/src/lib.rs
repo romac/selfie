@@ -248,7 +248,7 @@ impl<'a> ExprVisitorMut for NameExprVisitor<'a> {
                             // All good
                         }
 
-                        (Arg::Named(named), ParamKind::Normal | ParamKind::Alias(_)) => {
+                        (Arg::Named(named), ParamKind::Normal) => {
                             if named.sym.name == param.name {
                                 named.sym = *param;
                             } else {
@@ -257,6 +257,27 @@ impl<'a> ExprVisitorMut for NameExprVisitor<'a> {
                                     fn_sym.clone(),
                                     named.sym,
                                     *param,
+                                ));
+                            }
+                        }
+
+                        (Arg::Named(named), ParamKind::Alias(alias)) => {
+                            if named.sym.name == alias.name {
+                                // XXX: Should this be the sym of the param or the alias?
+                                named.sym = *alias;
+                            } else if named.sym.name == param.name {
+                                self.errors.push(Error::WrongArgLabel(
+                                    named.span(),
+                                    fn_sym.clone(),
+                                    named.sym,
+                                    *alias,
+                                ));
+                            } else {
+                                self.errors.push(Error::UnexpectedArg(
+                                    named.span(),
+                                    fn_sym.clone(),
+                                    named.sym,
+                                    *alias,
                                 ));
                             }
                         }
