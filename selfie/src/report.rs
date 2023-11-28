@@ -56,15 +56,22 @@ pub fn namer_error_to_report<'a>(e: &NamerError, id: String) -> Report<'a, Repor
 
     let span = e.span();
 
-    Report::build(ReportKind::Error, id.clone(), span.start)
+    let report = Report::build(ReportKind::Error, id.clone(), span.start)
         .with_code(2)
         .with_message(e.to_string())
         .with_label(
             Label::new((id.clone(), span.start..span.end))
                 .with_message(e.to_string())
                 .with_color(a),
-        )
-        .finish()
+        );
+
+    let report = if let Some(note) = e.note() {
+        report.with_note(note)
+    } else {
+        report
+    };
+
+    report.finish()
 }
 
 fn fmt_expected(tokens: &[Option<Token>], color: Color) -> String {

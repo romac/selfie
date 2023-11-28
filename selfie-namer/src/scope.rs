@@ -1,50 +1,56 @@
 use std::collections::HashMap;
 
 use indexmap::IndexMap;
-use selfie_ast::{Name, ParamKind, Sym};
+use selfie_ast::{Name, ParamKind, Span, Sym};
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct FnSym {
     pub sym: Sym,
+    pub span: Span,
     pub params: IndexMap<Name, (Sym, ParamKind)>,
     pub aliases: IndexMap<Name, Sym>,
 }
 
 impl FnSym {
-    pub fn new(sym: Sym) -> Self {
+    pub fn new(sym: Sym, span: Span) -> Self {
         Self {
             sym,
+            span,
             params: IndexMap::new(),
             aliases: IndexMap::new(),
         }
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct StructSym {
     pub sym: Sym,
+    pub span: Span,
     pub fields: IndexMap<Name, Sym>,
 }
 
 impl StructSym {
-    pub fn new(sym: Sym) -> Self {
+    pub fn new(sym: Sym, span: Span) -> Self {
         Self {
             sym,
+            span,
             fields: IndexMap::new(),
         }
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct EnumSym {
     pub sym: Sym,
+    pub span: Span,
     pub variants: IndexMap<Name, Sym>,
 }
 
 impl EnumSym {
-    pub fn new(sym: Sym) -> Self {
+    pub fn new(sym: Sym, span: Span) -> Self {
         Self {
             sym,
+            span,
             variants: IndexMap::new(),
         }
     }

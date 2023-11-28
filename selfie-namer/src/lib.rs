@@ -93,7 +93,7 @@ impl Namer {
     fn name_fn_decl_sig(&mut self, fn_decl: &mut FnDecl) {
         self.syms.freshen(&mut fn_decl.sym);
 
-        let mut fn_sym = FnSym::new(fn_decl.sym);
+        let mut fn_sym = FnSym::new(fn_decl.sym, fn_decl.span);
 
         for param in &mut fn_decl.params {
             self.syms.freshen(&mut param.sym);
@@ -124,7 +124,7 @@ impl Namer {
     fn name_struct_decl(&mut self, struct_decl: &mut StructDecl) {
         self.syms.freshen(&mut struct_decl.sym);
 
-        let mut struct_sym = StructSym::new(struct_decl.sym);
+        let mut struct_sym = StructSym::new(struct_decl.sym, struct_decl.span);
 
         for field in &mut struct_decl.fields {
             self.syms.freshen(&mut field.sym);
@@ -149,7 +149,7 @@ impl Namer {
     fn name_enum_decl(&mut self, enum_decl: &mut EnumDecl) {
         self.syms.freshen(&mut enum_decl.sym);
 
-        let mut enum_sym = EnumSym::new(enum_decl.sym);
+        let mut enum_sym = EnumSym::new(enum_decl.sym, enum_decl.span);
 
         for variant in &mut enum_decl.variants {
             self.syms.freshen(&mut variant.sym);
@@ -217,6 +217,7 @@ impl<'a> ExprVisitorMut for NameExprVisitor<'a> {
                 if call.args.len() != fn_sym.params.len() {
                     self.errors.push(Error::WrongArgCount(
                         call.span,
+                        fn_sym.clone(),
                         call.sym,
                         call.args.len(),
                         fn_sym.params.len(),
@@ -230,12 +231,17 @@ impl<'a> ExprVisitorMut for NameExprVisitor<'a> {
                 for (arg, (param, kind)) in zipped {
                     match (arg, kind) {
                         (Arg::Named(arg), ParamKind::Anon) => {
-                            self.errors
-                                .push(Error::ExtraneousArgLabel(arg.span(), arg.sym, *param));
+                            self.errors.push(Error::ExtraneousArgLabel(
+                                arg.span(),
+                                fn_sym.clone(),
+                                arg.sym,
+                                *param,
+                            ));
                         }
 
                         (Arg::Anon(arg), ParamKind::Normal | ParamKind::Alias(_)) => {
-                            self.errors.push(Error::MissingArgLabel(arg.span(), *param));
+                            self.errors
+                                .push(Error::MissingArgLabel(arg.span(), fn_sym.clone(), *param));
                         }
 
                         (Arg::Anon(_), ParamKind::Anon) => {
@@ -248,6 +254,7 @@ impl<'a> ExprVisitorMut for NameExprVisitor<'a> {
                             } else {
                                 self.errors.push(Error::UnexpectedArg(
                                     named.span(),
+                                    fn_sym.clone(),
                                     named.sym,
                                     *param,
                                 ));
@@ -300,21 +307,16 @@ impl<'a> ExprVisitorMut for NameExprVisitor<'a> {
                 for field in struct_sym.fields.keys() {
                     if !init.args.iter().any(|arg| &arg.sym.name == field) {
                         self.errors
-                            .push(Error::MissingField(init.span(), struct_sym.sym, *field));
+                            .push(Error::MissingField(init.span(), struct_sym.clone(), *field));
                     }
                 }
 
-                if init.args.len() == struct_sym.fields.len() {
-                    // TODO: Allow fields in any order?
-                    let zipped = init.args.iter_mut().zip(struct_sym.fields.values());
-
-                    for (arg, sym) in zipped {
-                        if arg.sym.name == sym.name {
-                            arg.sym = *sym;
-                        } else {
-                            self.errors
-                                .push(Error::UnexpectedArg(arg.span, arg.sym, *sym));
-                        }
+                for arg in &mut init.args {
+                    if let Some(sym) = struct_sym.fields.get(&arg.sym.name) {
+                        arg.sym = *sym;
+                    } else {
+                        self.errors
+                            .push(Error::UnknownField(arg.span, struct_sym.clone(), arg.sym));
                     }
                 }
             }
@@ -327,6 +329,7 @@ impl<'a> ExprVisitorMut for NameExprVisitor<'a> {
 
     fn visit_enum_init(&mut self, init: &mut EnumInit) {
         // TODO: Handle anonymous variants
+
         let sym = init.sym.unwrap();
 
         match self.syms.get_enum(&sym.name) {
@@ -341,7 +344,7 @@ impl<'a> ExprVisitorMut for NameExprVisitor<'a> {
                     init.variant = *variant_sym;
                 } else {
                     self.errors
-                        .push(Error::UnknownVariant(init.span(), init.variant));
+                        .push(Error::UnknownVariant(init.span(), enum_sym.clone(), init.variant));
                 }
             }
         }

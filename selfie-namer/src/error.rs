@@ -1,5 +1,8 @@
+use itertools::Itertools;
 use selfie_ast::{Name, Span, Sym};
 use thiserror::Error;
+
+use crate::scope::{EnumSym, FnSym, StructSym};
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -21,29 +24,44 @@ pub enum Error {
     #[error("unknown type `{0}`")]
     UnknownType(Sym),
 
-    #[error("unexpected argument `{1}`, expected `{2}`")]
-    UnexpectedArg(Span, Sym, Sym),
-
-    #[error("wrong number of arguments for `{1}`: expected {2}, found {3}")]
-    WrongArgCount(Span, Sym, usize, usize),
-
-    #[error("extraneous argument label `{1}` for anonymous parameter `{2}`")]
-    ExtraneousArgLabel(Span, Sym, Sym),
-
-    #[error("missing argument label for parameter `{1}`")]
-    MissingArgLabel(Span, Sym),
-
     #[error("duplicate field `{1}`")]
     DuplicateField(Span, Sym),
 
     #[error("duplicate variant `{1}`")]
     DuplicateVariant(Span, Sym),
 
-    #[error("unknown variant `{1}`")]
-    UnknownVariant(Span, Sym),
+    #[error("unexpected argument `{2}`, expected `{3}`")]
+    UnexpectedArg(Span, FnSym, Sym, Sym),
+
+    #[error("wrong number of arguments for `{2}`: expected {3}, found {4}")]
+    WrongArgCount(Span, FnSym, Sym, usize, usize),
+
+    #[error("extraneous argument label `{2}` for anonymous parameter `{3}`")]
+    ExtraneousArgLabel(Span, FnSym, Sym, Sym),
+
+    #[error("missing argument label for parameter `{2}`")]
+    MissingArgLabel(Span, FnSym, Sym),
+
+    #[error("unknown variant `{2}`")]
+    UnknownVariant(Span, EnumSym, Sym),
 
     #[error("missing field `{2}`")]
-    MissingField(Span, Sym, Name),
+    MissingField(Span, StructSym, Name),
+
+    #[error("unknown field `{2}`")]
+    UnknownField(Span, StructSym, Sym),
+}
+
+fn show_args(fn_sym: &FnSym) -> String {
+    fn_sym.params.keys().join(", ")
+}
+
+fn show_variants(enum_sym: &EnumSym) -> String {
+    enum_sym.variants.keys().join(", ")
+}
+
+fn show_fields(struct_sym: &StructSym) -> String {
+    struct_sym.fields.keys().join(", ")
 }
 
 impl Error {
@@ -55,14 +73,27 @@ impl Error {
             Self::UnboundVar(span, _) => *span,
             Self::UnboundFn(span, _) => *span,
             Self::UnknownType(_) => todo!(),
-            Self::UnexpectedArg(span, _, _) => *span,
-            Self::WrongArgCount(span, _, _, _) => *span,
-            Self::ExtraneousArgLabel(span, _, _) => *span,
-            Self::MissingArgLabel(span, _) => *span,
+            Self::UnexpectedArg(span, _, _, _) => *span,
+            Self::WrongArgCount(span, _, _, _, _) => *span,
+            Self::ExtraneousArgLabel(span, _, _, _) => *span,
+            Self::MissingArgLabel(span, _, _) => *span,
             Self::DuplicateField(span, _) => *span,
             Self::DuplicateVariant(span, _) => *span,
-            Self::UnknownVariant(span, _) => *span,
+            Self::UnknownVariant(span, _, _) => *span,
             Self::MissingField(span, _, _) => *span,
+            Self::UnknownField(span, _, _) => *span,
+        }
+    }
+
+    pub fn note(&self) -> Option<String> {
+        match self {
+            Self::UnknownField(_, struct_sym, _) => {
+                Some(format!("available fields: {}", show_fields(struct_sym)))
+            }
+            Self::UnknownVariant(_, enum_sym, _) => {
+                Some(format!("available variants: {}", show_variants(enum_sym)))
+            }
+            _ => None,
         }
     }
 }
