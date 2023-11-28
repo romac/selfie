@@ -9,15 +9,15 @@ enum Bar {
 struct Foo {
     x: Int64
     y: Bool
-    bar: Bar
-    x: String
+    z: String
 }
 
 fn addBad(_ x: Int64, to y: Int64, now: Bool): (Int64, Bool) {
   let foo = now || false
   let a = Bar.cat(x)
   let b = Bar.dog
-  let c = Foo(pie: x, y: y, bar: b)
+  let c = Foo(pie: x, y: y, z: !now)
+  let c = Foo(x: x + 1, y: y + 2)
 
   a + b + c.apple
 }

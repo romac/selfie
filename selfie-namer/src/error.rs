@@ -1,4 +1,4 @@
-use selfie_ast::{Span, Sym};
+use selfie_ast::{Name, Span, Sym};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -41,6 +41,9 @@ pub enum Error {
 
     #[error("unknown variant `{1}`")]
     UnknownVariant(Span, Sym),
+
+    #[error("missing field `{2}`")]
+    MissingField(Span, Sym, Name),
 }
 
 impl Error {
@@ -59,6 +62,7 @@ impl Error {
             Self::DuplicateField(span, _) => *span,
             Self::DuplicateVariant(span, _) => *span,
             Self::UnknownVariant(span, _) => *span,
+            Self::MissingField(span, _, _) => *span,
         }
     }
 }

@@ -297,27 +297,24 @@ impl<'a> ExprVisitorMut for NameExprVisitor<'a> {
             Some(struct_sym) => {
                 init.sym = struct_sym.sym;
 
-                if init.args.len() != struct_sym.fields.len() {
-                    // TODO: Use bespoke error
-                    self.errors.push(Error::WrongArgCount(
-                        init.span,
-                        init.sym,
-                        init.args.len(),
-                        struct_sym.fields.len(),
-                    ));
-
-                    return;
+                for field in struct_sym.fields.keys() {
+                    if !init.args.iter().any(|arg| &arg.sym.name == field) {
+                        self.errors
+                            .push(Error::MissingField(init.span(), struct_sym.sym, *field));
+                    }
                 }
 
-                // TODO: Allow fields in any order?
-                let zipped = init.args.iter_mut().zip(struct_sym.fields.values());
+                if init.args.len() == struct_sym.fields.len() {
+                    // TODO: Allow fields in any order?
+                    let zipped = init.args.iter_mut().zip(struct_sym.fields.values());
 
-                for (arg, sym) in zipped {
-                    if arg.sym.name == sym.name {
-                        arg.sym = *sym;
-                    } else {
-                        self.errors
-                            .push(Error::UnexpectedArg(arg.span, arg.sym, *sym));
+                    for (arg, sym) in zipped {
+                        if arg.sym.name == sym.name {
+                            arg.sym = *sym;
+                        } else {
+                            self.errors
+                                .push(Error::UnexpectedArg(arg.span, arg.sym, *sym));
+                        }
                     }
                 }
             }
