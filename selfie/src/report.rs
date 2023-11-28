@@ -31,6 +31,7 @@ pub fn parse_error_to_report<'a>(e: &ParseError, id: &str) -> Report<'a, ReportS
     let mut colors = ColorGenerator::new();
     let fg1 = colors.next();
     let fg2 = colors.next();
+    let fg3 = colors.next();
 
     let span = e.span();
     let expected = e.expected();
@@ -41,7 +42,7 @@ pub fn parse_error_to_report<'a>(e: &ParseError, id: &str) -> Report<'a, ReportS
     let found = fmt_found(found).fg(fg1);
     let expected = fmt_expected(expected, fg2).fg(fg2);
 
-    Report::build(ReportKind::Error, id.to_string(), span.start)
+    let mut report = Report::build(ReportKind::Error, id.to_string(), span.start)
         .with_code(2)
         .with_message(format!(
             "Unexpected token {found}, expected {one_of}{expected}",
@@ -50,8 +51,17 @@ pub fn parse_error_to_report<'a>(e: &ParseError, id: &str) -> Report<'a, ReportS
             Label::new((id.to_string(), span.start..span.end))
                 .with_message(format!("Unexpected token {found}"))
                 .with_color(fg1),
-        )
-        .finish()
+        );
+
+    for (label, span) in e.contexts() {
+        report.add_label(
+            Label::new((id.to_string(), span.start..span.end))
+                .with_message(label)
+                .with_color(fg3),
+        );
+    }
+
+    report.finish()
 }
 
 pub fn namer_error_to_report<'a>(e: &NamerError, id: &str) -> Report<'a, ReportSpan> {
@@ -60,7 +70,7 @@ pub fn namer_error_to_report<'a>(e: &NamerError, id: &str) -> Report<'a, ReportS
 
     let span = e.span();
 
-    let report = Report::build(ReportKind::Error, id.to_string(), span.start)
+    let mut report = Report::build(ReportKind::Error, id.to_string(), span.start)
         .with_code(2)
         .with_message(e.to_string())
         .with_label(
@@ -69,11 +79,9 @@ pub fn namer_error_to_report<'a>(e: &NamerError, id: &str) -> Report<'a, ReportS
                 .with_color(fg),
         );
 
-    let report = if let Some(note) = e.note() {
-        report.with_note(note)
-    } else {
-        report
-    };
+    if let Some(note) = e.note() {
+        report.set_note(note);
+    }
 
     report.finish()
 }
