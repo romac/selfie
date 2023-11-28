@@ -316,7 +316,6 @@ impl<'a> ExprVisitorMut for NameExprVisitor<'a> {
 
     fn visit_field_access(&mut self, field: &mut FieldAccess) {
         self.visit_expr(&mut field.expr);
-        // TODO: Check that field exists
     }
 
     fn visit_struct_init(&mut self, init: &mut StructInit) {
@@ -358,26 +357,24 @@ impl<'a> ExprVisitorMut for NameExprVisitor<'a> {
     }
 
     fn visit_enum_init(&mut self, init: &mut EnumInit) {
-        // TODO: Handle anonymous variants
+        if let Some(sym) = init.sym {
+            match self.syms.get_enum(&sym.name) {
+                None => {
+                    self.errors.push(Error::UnknownType(sym));
+                }
 
-        let sym = init.sym.unwrap();
+                Some(enum_sym) => {
+                    init.sym = Some(enum_sym.sym);
 
-        match self.syms.get_enum(&sym.name) {
-            None => {
-                self.errors.push(Error::UnknownType(sym));
-            }
-
-            Some(enum_sym) => {
-                init.sym = Some(enum_sym.sym);
-
-                if let Some(variant_sym) = enum_sym.variants.get(&init.variant.name) {
-                    init.variant = *variant_sym;
-                } else {
-                    self.errors.push(Error::UnknownVariant(
-                        init.span(),
-                        enum_sym.clone(),
-                        init.variant,
-                    ));
+                    if let Some(variant_sym) = enum_sym.variants.get(&init.variant.name) {
+                        init.variant = *variant_sym;
+                    } else {
+                        self.errors.push(Error::UnknownVariant(
+                            init.span(),
+                            enum_sym.clone(),
+                            init.variant,
+                        ));
+                    }
                 }
             }
         }

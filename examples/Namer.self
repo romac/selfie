@@ -18,7 +18,7 @@ fn callAdd(): Unit {
 fn add(_ x: Int64, to y: Int64, now: Bool): (Int64, Bool) {
   let foo = now || false
   let a = Bar.abc(x)
-  let b = Bar.def
+  let b = .def
   let c = Foo(x: x, y: y, bar: b)
 
   a + b + c.x
