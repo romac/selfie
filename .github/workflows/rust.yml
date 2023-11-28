@@ -1,0 +1,59 @@
+name: Rust
+on:
+  pull_request:
+  push:
+    branches: main
+
+env:
+  CARGO_INCREMENTAL: 0
+  CARGO_PROFILE_DEV_DEBUG: 1
+  CARGO_PROFILE_RELEASE_DEBUG: 1
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: short
+  CARGO_NET_RETRY: 10
+  RUSTUP_MAX_RETRIES: 10
+
+jobs:
+  fmt:
+    name: Format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+      - name: Check formatting
+        uses: actions-rust-lang/rustfmt@v1
+
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+      - name: Run clippy
+        uses: giraffate/clippy-action@v1
+        with:
+          reporter: 'github-pr-check'
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@nextest
+      - name: Build tests
+        uses: actions-rs/cargo@v1
+        with:
+          command: nextest
+          args: run --all-features --no-run
+      - name: Run tests
+        uses: actions-rs/cargo@v1
+        with:
+          command: nextest
+          args: run --all-features --no-fail-fast --no-capture
+
