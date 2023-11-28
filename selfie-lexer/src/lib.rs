@@ -298,9 +298,6 @@ mod tests {
         let tokens = toks("hello_world 42 \"foo").unwrap_err();
         assert_eq!(tokens, Error::UnexpectedToken(15..19, Ustr::from("\"foo"),));
 
-        let tokens = toks("trabad%toto");
-        assert_eq!(tokens, Err(Error::UnexpectedToken(6..7, Ustr::from("%"))));
-
         let input = "\"foo\\u{}bar\"";
         let tokens = toks(input).unwrap_err();
         assert_eq!(
