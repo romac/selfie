@@ -83,6 +83,10 @@ pub fn namer_error_to_report<'a>(e: &NamerError, id: &str) -> Report<'a, ReportS
         report.set_note(note);
     }
 
+    if let Some(help) = e.help() {
+        report.set_help(help);
+    }
+
     report.finish()
 }
 

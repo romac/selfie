@@ -36,10 +36,10 @@ pub enum Error {
     #[error("wrong number of arguments for `{2}`: expected {3}, found {4}")]
     WrongArgCount(Span, FnSym, Sym, usize, usize),
 
-    #[error("extraneous argument label `{2}` for anonymous parameter `{3}`")]
+    #[error("extraneous argument label `{2}:` for anonymous parameter `{3}`")]
     ExtraneousArgLabel(Span, FnSym, Sym, Sym),
 
-    #[error("missing argument label for parameter `{2}`")]
+    #[error("missing argument label `{2}:`")]
     MissingArgLabel(Span, FnSym, Sym),
 
     #[error("unknown variant `{2}`")]
@@ -96,6 +96,21 @@ impl Error {
             Self::WrongArgLabel(_, _, arg, alias) => Some(format!(
                 "parameter `{arg}` exists but is aliased as `{alias}`"
             )),
+            _ => None,
+        }
+    }
+
+    pub fn help(&self) -> Option<String> {
+        match self {
+            Self::ExtraneousArgLabel(_, _, arg, _) => {
+                Some(format!("consider removing the argument label `{arg}:`"))
+            }
+            Self::MissingArgLabel(_, _, param) => {
+                Some(format!("consider adding an argument label `{param}:`"))
+            }
+            Self::WrongArgLabel(_, _, arg, expected) => {
+                Some(format!("consider changing `{arg}:` to `{expected}:`"))
+            }
             _ => None,
         }
     }
