@@ -1,14 +1,12 @@
 use std::path::Path;
 
 use ariadne::Source;
-use selfie_ast::Program;
-use selfie_namer::Namer;
 use thiserror::Error;
 
+use selfie::ast::Program;
 use selfie::lexer::Error as LexError;
 use selfie::namer::Error as NamerError;
 use selfie::parser::Error as ParseError;
-
 use selfie::report::*;
 
 fn main() {
@@ -62,19 +60,18 @@ fn pipeline(input: &str, path: &Path) -> Result<(), Vec<Error>> {
 
     let cg = program.build_call_graph();
 
-    for fn_ in program.fns() {
-        dbg!(cg.build_fn_info(fn_.sym));
+    for fn_decl in program.fns() {
+        dbg!(cg.build_fn_info(fn_decl.sym));
     }
 
-    let namer = Namer::new();
-    let syms = namer.name_program(&mut program).map_err(|errs| {
+    let syms = selfie::namer::name_program(&mut program).map_err(|errs| {
         errs.into_iter()
             .map(|e| Error::Namer(Box::new(e)))
             .collect::<Vec<_>>()
     })?;
 
-    dbg!(syms);
-    dbg!(program);
+    println!("=== Namer - Symbols ===\n{syms:#?}\n");
+    println!("=== Namer - Program ===\n{program:#?}\n");
 
     Ok(())
 }
@@ -84,9 +81,9 @@ fn print_errors(path: &Path, input: &str, errors: Vec<Error>) {
 
     for e in errors {
         let report = match e {
-            Error::Lex(e) => lex_error_to_report(&e, &id),
-            Error::Parse(e) => parse_error_to_report(&e, &id),
-            Error::Namer(e) => namer_error_to_report(&e, &id),
+            Error::Lex(e) => report_lex_error(&e, &id),
+            Error::Parse(e) => report_parse_error(&e, &id),
+            Error::Namer(e) => report_namer_error(&e, &id),
         };
 
         let _ = report.eprint((id.clone(), Source::from(input)));

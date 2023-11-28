@@ -32,6 +32,10 @@ impl Ids {
     }
 }
 
+pub fn name_program(program: &mut Program) -> Result<ScopeStack, Vec<Error>> {
+    Namer::new().name_program(program)
+}
+
 #[derive(Debug)]
 pub struct Namer {
     ids: Ids,

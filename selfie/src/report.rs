@@ -10,7 +10,7 @@ use crate::parser::Error as ParseError;
 
 pub type ReportSpan = (String, Range<usize>);
 
-pub fn lex_error_to_report<'a>(e: &LexError, id: &str) -> Report<'a, ReportSpan> {
+pub fn report_lex_error<'a>(e: &LexError, id: &str) -> Report<'a, ReportSpan> {
     let mut colors = ColorGenerator::new();
 
     let a = colors.next();
@@ -27,7 +27,7 @@ pub fn lex_error_to_report<'a>(e: &LexError, id: &str) -> Report<'a, ReportSpan>
         .finish()
 }
 
-pub fn parse_error_to_report<'a>(e: &ParseError, id: &str) -> Report<'a, ReportSpan> {
+pub fn report_parse_error<'a>(e: &ParseError, id: &str) -> Report<'a, ReportSpan> {
     let mut colors = ColorGenerator::new();
     let fg1 = colors.next();
     let fg2 = colors.next();
@@ -64,7 +64,7 @@ pub fn parse_error_to_report<'a>(e: &ParseError, id: &str) -> Report<'a, ReportS
     report.finish()
 }
 
-pub fn namer_error_to_report<'a>(e: &NamerError, id: &str) -> Report<'a, ReportSpan> {
+pub fn report_namer_error<'a>(e: &NamerError, id: &str) -> Report<'a, ReportSpan> {
     let mut colors = ColorGenerator::new();
     let fg = colors.next();
 

@@ -483,6 +483,9 @@ mod tests {
         for example in examples {
             let example = example.unwrap();
             let path = example.path();
+            if path.file_stem().unwrap().to_str().unwrap().ends_with("Bad") {
+                continue;
+            }
             if path.extension().unwrap() == "self" {
                 println!("Parsing {:?}", path);
 
