@@ -125,6 +125,7 @@ impl Namer {
         self.syms.freshen(&mut struct_decl.sym);
 
         let mut struct_sym = StructSym::new(struct_decl.sym, struct_decl.span);
+        self.syms.add_struct(struct_sym.clone());
 
         for field in &mut struct_decl.fields {
             self.syms.freshen(&mut field.sym);
@@ -139,7 +140,6 @@ impl Namer {
                     .push(Error::DuplicateField(field.span(), field.sym));
             }
 
-            // TODO: Handle recursive types
             self.name_type(&mut field.ty);
         }
 
@@ -150,6 +150,7 @@ impl Namer {
         self.syms.freshen(&mut enum_decl.sym);
 
         let mut enum_sym = EnumSym::new(enum_decl.sym, enum_decl.span);
+        self.syms.add_enum(enum_sym.clone());
 
         for variant in &mut enum_decl.variants {
             self.syms.freshen(&mut variant.sym);
@@ -164,7 +165,6 @@ impl Namer {
                     .push(Error::DuplicateVariant(variant.span(), variant.sym));
             }
 
-            // TODO: Handle recursive types
             if let Some(ty) = &mut variant.ty {
                 self.name_type(ty);
             }
@@ -182,7 +182,14 @@ impl Namer {
         visitor.visit_expr(expr);
     }
 
-    fn name_type(&self, _ty: &mut Type) {}
+    fn name_type(&mut self, ty: &mut Type) {
+        let mut visitor = NameTypeVisitor {
+            syms: &mut self.syms,
+            errors: &mut self.errors,
+        };
+
+        visitor.visit_type(ty);
+    }
 }
 
 impl Default for Namer {
@@ -321,7 +328,7 @@ impl<'a> ExprVisitorMut for NameExprVisitor<'a> {
     fn visit_struct_init(&mut self, init: &mut StructInit) {
         match self.syms.get_struct(&init.sym.name) {
             None => {
-                self.errors.push(Error::UnknownType(init.sym));
+                self.errors.push(Error::UnknownType(init.span, init.sym));
             }
 
             Some(struct_sym) => {
@@ -360,7 +367,7 @@ impl<'a> ExprVisitorMut for NameExprVisitor<'a> {
         if let Some(sym) = init.sym {
             match self.syms.get_enum(&sym.name) {
                 None => {
-                    self.errors.push(Error::UnknownType(sym));
+                    self.errors.push(Error::UnknownType(init.span, sym));
                 }
 
                 Some(enum_sym) => {
@@ -391,7 +398,7 @@ struct NameTypeVisitor<'a> {
 }
 
 impl<'a> TypeVisitorMut for NameTypeVisitor<'a> {
-    fn visit_named(&mut self, sym: &mut Sym) {
+    fn visit_named(&mut self, span: Span, sym: &mut Sym) {
         let decl_sym = self
             .syms
             .get_struct(&sym.name)
@@ -401,7 +408,7 @@ impl<'a> TypeVisitorMut for NameTypeVisitor<'a> {
         if let Some(decl_sym) = decl_sym {
             *sym = decl_sym;
         } else {
-            self.errors.push(Error::UnknownType(*sym));
+            self.errors.push(Error::UnknownType(span, *sym));
         }
     }
 }

@@ -1,6 +1,6 @@
-use crate::Sym;
+use crate::{Span, Sym};
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Type {
     Int64,
     Float64,
@@ -8,6 +8,6 @@ pub enum Type {
     Bool,
     Unit,
     Tuple(Vec<Type>),
-    Named(Sym),
+    Named(Span, Sym),
     Fn { args: Vec<Type>, ret: Box<Type> },
 }

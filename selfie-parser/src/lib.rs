@@ -69,14 +69,14 @@ pub fn parse_lower() -> impl Parser<Sym> {
 }
 
 pub fn parse_type() -> impl Parser<Type> {
-    fn to_type(sym: Sym) -> Type {
+    fn to_type(sym: Sym, span: Span) -> Type {
         match sym.as_str() {
             "String" => Type::String,
             "Bool" => Type::Bool,
             "Unit" => Type::Unit,
             "Int64" => Type::Int64,
             "Float64" => Type::Float64,
-            _ => Type::Named(sym),
+            _ => Type::Named(span, sym),
         }
     }
 
@@ -87,7 +87,10 @@ pub fn parse_type() -> impl Parser<Type> {
             .allow_trailing()
             .collect::<Vec<_>>();
 
-        choice((parens(tys).map(Type::Tuple), parse_upper().map(to_type)))
+        choice((
+            parens(tys).map(Type::Tuple),
+            parse_upper().map_with(|sym, meta| to_type(sym, meta.span())),
+        ))
     })
 }
 

@@ -47,3 +47,13 @@ fn titi(): Bool {
 fn tete(): Bool {
   false
 }
+
+enum List {
+  .nil
+  .cons((Int64, List))
+}
+
+struct InfiniteList {
+  head: Int64
+  tail: InfiniteList
+}

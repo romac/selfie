@@ -17,7 +17,7 @@ pub trait TypeVisitor {
         }
     }
 
-    fn visit_named(&mut self, _sym: &Sym) {}
+    fn visit_named(&mut self, _span: Span, _sym: &Sym) {}
 
     fn visit_fn(&mut self, args: &[Type], ret: &Type) {
         for arg in args {
@@ -39,7 +39,7 @@ where
         Type::Bool => visitor.visit_bool(),
         Type::Unit => visitor.visit_unit(),
         Type::Tuple(tys) => visitor.visit_tuple(tys),
-        Type::Named(sym) => visitor.visit_named(sym),
+        Type::Named(span, sym) => visitor.visit_named(*span, sym),
         Type::Fn { args, ret } => visitor.visit_fn(args, ret),
     }
 }
@@ -61,7 +61,7 @@ pub trait TypeVisitorMut {
         }
     }
 
-    fn visit_named(&mut self, _sym: &mut Sym) {}
+    fn visit_named(&mut self, _span: Span, _sym: &mut Sym) {}
 
     fn visit_fn(&mut self, args: &mut [Type], ret: &mut Type) {
         for arg in args {
@@ -83,7 +83,7 @@ where
         Type::Bool => visitor.visit_bool(),
         Type::Unit => visitor.visit_unit(),
         Type::Tuple(tys) => visitor.visit_tuple(tys),
-        Type::Named(sym) => visitor.visit_named(sym),
+        Type::Named(span, sym) => visitor.visit_named(*span, sym),
         Type::Fn { args, ret } => visitor.visit_fn(args, ret),
     }
 }

@@ -21,8 +21,8 @@ pub enum Error {
     #[error("call to unbound function `{1}`")]
     UnboundFn(Span, Sym),
 
-    #[error("unknown type `{0}`")]
-    UnknownType(Sym),
+    #[error("unknown type `{1}`")]
+    UnknownType(Span, Sym),
 
     #[error("duplicate field `{1}`")]
     DuplicateField(Span, Sym),
@@ -71,7 +71,7 @@ impl Error {
             Self::DuplicateDecl(span, _) => *span,
             Self::UnboundVar(span, _) => *span,
             Self::UnboundFn(span, _) => *span,
-            Self::UnknownType(_) => todo!(),
+            Self::UnknownType(span, _) => *span,
             Self::UnexpectedArg(span, _, _, _) => *span,
             Self::WrongArgCount(span, _, _, _, _) => *span,
             Self::ExtraneousArgLabel(span, _, _, _) => *span,
