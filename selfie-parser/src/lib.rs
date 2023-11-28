@@ -71,11 +71,11 @@ pub fn parse_lower() -> impl Parser<Sym> {
 pub fn parse_type() -> impl Parser<Type> {
     fn to_type(sym: Sym, span: Span) -> Type {
         match sym.as_str() {
-            "String" => Type::String,
-            "Bool" => Type::Bool,
-            "Unit" => Type::Unit,
-            "Int64" => Type::Int64,
-            "Float64" => Type::Float64,
+            "String" => Type::String(span),
+            "Bool" => Type::Bool(span),
+            "Unit" => Type::Unit(span),
+            "Int64" => Type::Int64(span),
+            "Float64" => Type::Float64(span),
             _ => Type::Named(span, sym),
         }
     }
@@ -88,7 +88,7 @@ pub fn parse_type() -> impl Parser<Type> {
             .collect::<Vec<_>>();
 
         choice((
-            parens(tys).map(Type::Tuple),
+            parens(tys).map_with(|tys, meta| Type::Tuple(meta.span(), tys)),
             parse_upper().map_with(|sym, meta| to_type(sym, meta.span())),
         ))
     })

@@ -5,13 +5,13 @@ pub trait TypeVisitor {
         walk_type(ty, self)
     }
 
-    fn visit_int64(&mut self) {}
-    fn visit_float64(&mut self) {}
-    fn visit_string(&mut self) {}
-    fn visit_bool(&mut self) {}
-    fn visit_unit(&mut self) {}
+    fn visit_int64(&mut self, _span: Span) {}
+    fn visit_float64(&mut self, _span: Span) {}
+    fn visit_string(&mut self, _span: Span) {}
+    fn visit_bool(&mut self, _span: Span) {}
+    fn visit_unit(&mut self, _span: Span) {}
 
-    fn visit_tuple(&mut self, tys: &[Type]) {
+    fn visit_tuple(&mut self, _span: Span, tys: &[Type]) {
         for ty in tys {
             self.visit_type(ty);
         }
@@ -19,7 +19,7 @@ pub trait TypeVisitor {
 
     fn visit_named(&mut self, _span: Span, _sym: &Sym) {}
 
-    fn visit_fn(&mut self, args: &[Type], ret: &Type) {
+    fn visit_fn(&mut self, _span: Span, args: &[Type], ret: &Type) {
         for arg in args {
             self.visit_type(arg);
         }
@@ -33,14 +33,14 @@ where
     V: TypeVisitor + ?Sized,
 {
     match ty {
-        Type::Int64 => visitor.visit_int64(),
-        Type::Float64 => visitor.visit_float64(),
-        Type::String => visitor.visit_string(),
-        Type::Bool => visitor.visit_bool(),
-        Type::Unit => visitor.visit_unit(),
-        Type::Tuple(tys) => visitor.visit_tuple(tys),
+        Type::Int64(span) => visitor.visit_int64(*span),
+        Type::Float64(span) => visitor.visit_float64(*span),
+        Type::String(span) => visitor.visit_string(*span),
+        Type::Bool(span) => visitor.visit_bool(*span),
+        Type::Unit(span) => visitor.visit_unit(*span),
+        Type::Tuple(span, tys) => visitor.visit_tuple(*span, tys),
         Type::Named(span, sym) => visitor.visit_named(*span, sym),
-        Type::Fn { args, ret } => visitor.visit_fn(args, ret),
+        Type::Fn { span, args, ret } => visitor.visit_fn(*span, args, ret),
     }
 }
 
@@ -49,13 +49,13 @@ pub trait TypeVisitorMut {
         walk_type_mut(ty, self)
     }
 
-    fn visit_int64(&mut self) {}
-    fn visit_float64(&mut self) {}
-    fn visit_string(&mut self) {}
-    fn visit_bool(&mut self) {}
-    fn visit_unit(&mut self) {}
+    fn visit_int64(&mut self, _span: Span) {}
+    fn visit_float64(&mut self, _span: Span) {}
+    fn visit_string(&mut self, _span: Span) {}
+    fn visit_bool(&mut self, _span: Span) {}
+    fn visit_unit(&mut self, _span: Span) {}
 
-    fn visit_tuple(&mut self, tys: &mut [Type]) {
+    fn visit_tuple(&mut self, _span: Span, tys: &mut [Type]) {
         for ty in tys {
             self.visit_type(ty);
         }
@@ -63,7 +63,7 @@ pub trait TypeVisitorMut {
 
     fn visit_named(&mut self, _span: Span, _sym: &mut Sym) {}
 
-    fn visit_fn(&mut self, args: &mut [Type], ret: &mut Type) {
+    fn visit_fn(&mut self, _span: Span, args: &mut [Type], ret: &mut Type) {
         for arg in args {
             self.visit_type(arg);
         }
@@ -77,13 +77,13 @@ where
     V: TypeVisitorMut + ?Sized,
 {
     match ty {
-        Type::Int64 => visitor.visit_int64(),
-        Type::Float64 => visitor.visit_float64(),
-        Type::String => visitor.visit_string(),
-        Type::Bool => visitor.visit_bool(),
-        Type::Unit => visitor.visit_unit(),
-        Type::Tuple(tys) => visitor.visit_tuple(tys),
+        Type::Int64(span) => visitor.visit_int64(*span),
+        Type::Float64(span) => visitor.visit_float64(*span),
+        Type::String(span) => visitor.visit_string(*span),
+        Type::Bool(span) => visitor.visit_bool(*span),
+        Type::Unit(span) => visitor.visit_unit(*span),
+        Type::Tuple(span, tys) => visitor.visit_tuple(*span, tys),
         Type::Named(span, sym) => visitor.visit_named(*span, sym),
-        Type::Fn { args, ret } => visitor.visit_fn(args, ret),
+        Type::Fn { span, args, ret } => visitor.visit_fn(*span, args, ret),
     }
 }
