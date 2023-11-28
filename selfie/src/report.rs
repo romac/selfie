@@ -1,70 +1,72 @@
 use std::ops::Range;
 
 use ariadne::{Color, ColorGenerator, Fmt, Label, Report, ReportKind};
+use chumsky::error::RichPattern;
 use selfie_lexer::Token;
 
+use crate::lexer::Error as LexError;
 use crate::namer::Error as NamerError;
 use crate::parser::Error as ParseError;
 
 pub type ReportSpan = (String, Range<usize>);
 
-pub fn parse_error_to_report<'a>(e: &ParseError, id: String) -> Report<'a, ReportSpan> {
+pub fn lex_error_to_report<'a>(e: &LexError, id: &str) -> Report<'a, ReportSpan> {
     let mut colors = ColorGenerator::new();
 
     let a = colors.next();
-    let b = colors.next();
+    let span = e.span();
 
-    match e {
-        ParseError::Lex(e) => Report::build(ReportKind::Error, id.clone(), e.span().start)
-            .with_code(1)
-            .with_message(e.to_string())
-            .with_label(
-                Label::new((id.clone(), e.span().clone()))
-                    .with_message(e.to_string())
-                    .with_color(a),
-            )
-            .finish(),
-
-        ParseError::ExpectedFound {
-            span,
-            expected,
-            found,
-        } => {
-            let some = expected.iter().filter(|e| e.is_some()).count() > 1;
-            let one_of = if some { "one of " } else { "" };
-
-            let found = fmt_found(*found).fg(a);
-            let expected = fmt_expected(expected, b).fg(b);
-
-            Report::build(ReportKind::Error, id.clone(), span.start)
-                .with_code(2)
-                .with_message(format!(
-                    "Unexpected token {found}, expected {one_of}{expected}",
-                ))
-                .with_label(
-                    Label::new((id.clone(), span.start..span.end))
-                        .with_message(format!("Unexpected token {found}"))
-                        .with_color(a),
-                )
-                .finish()
-        }
-    }
+    Report::build(ReportKind::Error, id.to_string(), span.start)
+        .with_code(1)
+        .with_message(e.to_string())
+        .with_label(
+            Label::new((id.to_string(), span.start..span.end))
+                .with_message(e.to_string())
+                .with_color(a),
+        )
+        .finish()
 }
 
-pub fn namer_error_to_report<'a>(e: &NamerError, id: String) -> Report<'a, ReportSpan> {
+pub fn parse_error_to_report<'a>(e: &ParseError, id: &str) -> Report<'a, ReportSpan> {
     let mut colors = ColorGenerator::new();
+    let fg1 = colors.next();
+    let fg2 = colors.next();
 
-    let a = colors.next();
+    let span = e.span();
+    let expected = e.expected();
+    let found = e.found();
+
+    let one_of = if expected.len() > 1 { "one of " } else { "" };
+
+    let found = fmt_found(found).fg(fg1);
+    let expected = fmt_expected(expected, fg2).fg(fg2);
+
+    Report::build(ReportKind::Error, id.to_string(), span.start)
+        .with_code(2)
+        .with_message(format!(
+            "Unexpected token {found}, expected {one_of}{expected}",
+        ))
+        .with_label(
+            Label::new((id.to_string(), span.start..span.end))
+                .with_message(format!("Unexpected token {found}"))
+                .with_color(fg1),
+        )
+        .finish()
+}
+
+pub fn namer_error_to_report<'a>(e: &NamerError, id: &str) -> Report<'a, ReportSpan> {
+    let mut colors = ColorGenerator::new();
+    let fg = colors.next();
 
     let span = e.span();
 
-    let report = Report::build(ReportKind::Error, id.clone(), span.start)
+    let report = Report::build(ReportKind::Error, id.to_string(), span.start)
         .with_code(2)
         .with_message(e.to_string())
         .with_label(
-            Label::new((id.clone(), span.start..span.end))
+            Label::new((id.to_string(), span.start..span.end))
                 .with_message(e.to_string())
-                .with_color(a),
+                .with_color(fg),
         );
 
     let report = if let Some(note) = e.note() {
@@ -76,19 +78,22 @@ pub fn namer_error_to_report<'a>(e: &NamerError, id: String) -> Report<'a, Repor
     report.finish()
 }
 
-fn fmt_expected(tokens: &[Option<Token>], color: Color) -> String {
+fn fmt_expected<'a>(
+    tokens: impl ExactSizeIterator<Item = &'a RichPattern<'a, Token>>,
+    color: Color,
+) -> String {
     tokens
-        .iter()
-        .map(|t| {
-            t.map(|t| t.fg(color).to_string())
-                .unwrap_or_else(|| "EOF".fg(color).to_string())
+        .map(|t| match t {
+            RichPattern::Token(t) => t.fg(color).to_string(),
+            RichPattern::Label(l) => l.fg(color).to_string(),
+            RichPattern::EndOfInput => "end of input".to_string(),
         })
         .collect::<Vec<_>>()
         .join(", ")
 }
 
-fn fmt_found(token: Option<Token>) -> String {
+fn fmt_found(token: Option<&Token>) -> String {
     token
         .map(|t| t.to_string())
-        .unwrap_or_else(|| "EOF".to_string())
+        .unwrap_or_else(|| "end of input".to_string())
 }

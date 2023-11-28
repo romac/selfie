@@ -5,6 +5,7 @@ use selfie_ast::Program;
 use selfie_namer::Namer;
 use thiserror::Error;
 
+use selfie::lexer::Error as LexError;
 use selfie::namer::Error as NamerError;
 use selfie::parser::Error as ParseError;
 
@@ -19,11 +20,14 @@ fn main() {
 
 #[derive(Debug, Error)]
 pub enum Error {
+    #[error("lexer error")]
+    Lex(LexError),
+
     #[error("parse error")]
-    Parse(#[source] ParseError),
+    Parse(ParseError),
 
     #[error("namer error")]
-    Namer(#[source] NamerError),
+    Namer(Box<NamerError>),
 }
 
 fn run() -> Result<(), Box<dyn std::error::Error>> {
@@ -47,7 +51,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn pipeline(input: &str, path: &Path) -> Result<(), Vec<Error>> {
-    let module = selfie::parser::parse_module(input, path)
+    let tokens = selfie::lexer::lex(input).map_err(|e| vec![Error::Lex(e)])?;
+
+    let module = selfie::parser::parse_module(tokens, path)
         .map_err(|errs| errs.into_iter().map(Error::Parse).collect::<Vec<_>>())?;
 
     let mut program = Program {
@@ -61,9 +67,11 @@ fn pipeline(input: &str, path: &Path) -> Result<(), Vec<Error>> {
     }
 
     let namer = Namer::new();
-    let syms = namer
-        .name_program(&mut program)
-        .map_err(|errs| errs.into_iter().map(Error::Namer).collect::<Vec<_>>())?;
+    let syms = namer.name_program(&mut program).map_err(|errs| {
+        errs.into_iter()
+            .map(|e| Error::Namer(Box::new(e)))
+            .collect::<Vec<_>>()
+    })?;
 
     dbg!(syms);
     dbg!(program);
@@ -75,16 +83,12 @@ fn print_errors(path: &Path, input: &str, errors: Vec<Error>) {
     let id = path.display().to_string();
 
     for e in errors {
-        match e {
-            Error::Parse(e) => {
-                let report = parse_error_to_report(&e, id.clone());
-                let _ = report.eprint((id.clone(), Source::from(input)));
-            }
+        let report = match e {
+            Error::Lex(e) => lex_error_to_report(&e, &id),
+            Error::Parse(e) => parse_error_to_report(&e, &id),
+            Error::Namer(e) => namer_error_to_report(&e, &id),
+        };
 
-            Error::Namer(e) => {
-                let report = namer_error_to_report(&e, id.clone());
-                let _ = report.eprint((id.clone(), Source::from(input)));
-            }
-        }
+        let _ = report.eprint((id.clone(), Source::from(input)));
     }
 }

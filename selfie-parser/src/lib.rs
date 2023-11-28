@@ -8,7 +8,7 @@ use chumsky::recursive::recursive;
 use chumsky::{extra, select, IterParser};
 
 use selfie_ast::*;
-use selfie_lexer::{lex, Token};
+use selfie_lexer::Token;
 
 mod error;
 pub use error::Error;
@@ -16,16 +16,11 @@ pub use error::Error;
 pub type ParserInput = SpannedInput<Token, Span, Stream<std::vec::IntoIter<(Token, Span)>>>;
 pub trait Parser<A> = chumsky::Parser<'static, ParserInput, A, extra::Err<Error>> + Clone;
 
-pub fn parse_file(path: impl AsRef<Path>) -> Result<Module, Vec<Error>> {
-    let path = path.as_ref();
-    let contents = std::fs::read_to_string(path).unwrap();
+pub type Tokens = Vec<(Token, selfie_lexer::Span)>;
 
-    parse_module(&contents, path)
-}
-
-pub fn parse_module(contents: &str, path: &Path) -> Result<Module, Vec<Error>> {
+pub fn parse_module(tokens: Tokens, path: &Path) -> Result<Module, Vec<Error>> {
     let path = Ustr::from(&path.display().to_string());
-    let input = text_to_input(contents, path)?;
+    let input = tokens_to_input(tokens, path)?;
 
     let decls = parse_decl().repeated().collect::<Vec<_>>();
 
@@ -47,8 +42,7 @@ fn span(path: Ustr, range: std::ops::Range<usize>) -> Span {
     <Span as chumsky::span::Span>::new(path, range)
 }
 
-fn text_to_input(text: &str, path: Ustr) -> Result<ParserInput, Vec<Error>> {
-    let tokens = lex(text).map_err(|e| vec![Error::Lex(e)])?;
+fn tokens_to_input(tokens: Tokens, path: Ustr) -> Result<ParserInput, Vec<Error>> {
     let count = tokens.len();
 
     let tokens: Vec<_> = tokens
@@ -451,7 +445,34 @@ fn parens<A>(p: impl Parser<A>) -> impl Parser<A> {
 #[cfg(test)]
 #[allow(unused_variables)]
 mod tests {
+    use selfie_lexer::lex;
+
     use super::*;
+
+    fn text_to_input(text: &str, path: Ustr) -> Result<ParserInput, Vec<Error>> {
+        let tokens = lex(text)
+            .map_err(|e| vec![Error::custom(span(path, e.span().clone()), e.to_string())])?;
+
+        let count = tokens.len();
+
+        let tokens: Vec<_> = tokens
+            .into_iter()
+            .map(|(token, range)| (token, span(path, range)))
+            .collect();
+
+        Ok(Stream::from_iter(tokens).spanned(span(path, count..count)))
+    }
+
+    fn parse_file(path: impl AsRef<Path>) -> Result<Module, Vec<Error>> {
+        let path = path.as_ref();
+        let contents = std::fs::read_to_string(path).unwrap();
+        let tokens = lex(&contents).map_err(|e| {
+            let file = Ustr::from(&path.display().to_string());
+            vec![Error::custom(span(file, e.span().clone()), e.to_string())]
+        })?;
+
+        parse_module(tokens, path)
+    }
 
     #[test]
     fn parse_examples() {
