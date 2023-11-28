@@ -12,7 +12,6 @@ selfie-namer  = { path = "../selfie-namer" }
 
 ariadne.workspace       = true
 chumsky.workspace       = true
-nom.workspace           = true
 ordered-float.workspace = true
 thiserror.workspace     = true
 

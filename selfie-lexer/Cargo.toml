@@ -5,8 +5,8 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
+chumsky.workspace       = true
 logos.workspace         = true
-nom.workspace           = true
 ordered-float.workspace = true
 thiserror.workspace     = true
 ustr.workspace          = true

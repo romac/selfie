@@ -2,6 +2,7 @@ use core::fmt;
 use std::fmt::Debug;
 use std::str::FromStr;
 
+use chumsky::Parser;
 use logos::{Lexer, Logos};
 use ordered_float::OrderedFloat;
 use thiserror::Error;
@@ -54,8 +55,10 @@ mod lexers {
     }
 
     pub fn string(lex: &mut Lexer<Token>) -> Result<Ustr, Error> {
-        parse_string(lex.slice())
-            .map(|(_, s)| Ustr::from(&s))
+        parse_string()
+            .parse(lex.slice())
+            .into_result()
+            .map(|s| Ustr::from(&s))
             .map_err(|_| Error::InvalidStringLiteral(lex.span(), Ustr::from(lex.slice())))
     }
 
@@ -262,10 +265,7 @@ pub fn lex(input: &str) -> Result<Vec<(Token, Span)>, Error> {
             Ok(token) => tokens.push((token, lexer.span())),
 
             Err(Error::Other) => {
-                return Err(Error::UnexpectedToken(
-                    lexer.span(),
-                    Ustr::from(lexer.slice()),
-                ));
+                return Err(Error::UnexpectedToken(lexer.span(), Ustr::from(lexer.slice())));
             }
 
             Err(err) => return Err(err),
