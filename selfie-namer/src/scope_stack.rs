@@ -1,31 +1,16 @@
-use std::sync::atomic::AtomicU32;
-
 use selfie_ast::{Name, Sym};
 
 use crate::scope::{EnumSym, FnSym, StructSym};
 use crate::Scope;
 
-#[derive(Default, Debug)]
-pub struct Ids {
-    next: AtomicU32,
-}
-
-impl Ids {
-    pub fn next(&self) -> u32 {
-        self.next.fetch_add(1, std::sync::atomic::Ordering::SeqCst)
-    }
-}
-
 #[derive(Debug)]
-pub struct SymbolTable {
-    pub ids: Ids,
-    pub scopes: Vec<Scope>,
+pub struct ScopeStack {
+    scopes: Vec<Scope>,
 }
 
-impl SymbolTable {
+impl ScopeStack {
     pub fn new() -> Self {
         Self {
-            ids: Ids::default(),
             scopes: vec![Scope::default()],
         }
     }
@@ -114,13 +99,9 @@ impl SymbolTable {
             .rev()
             .find_map(|scope| scope.get_enum(name))
     }
-
-    pub fn freshen(&self, sym: &mut Sym) {
-        sym.id = self.ids.next();
-    }
 }
 
-impl Default for SymbolTable {
+impl Default for ScopeStack {
     fn default() -> Self {
         Self::new()
     }
