@@ -1,15 +1,13 @@
-use std::collections::HashMap;
-
 use indexmap::IndexMap;
 
 use crate::{Name, ParamKind, Span, Sym, Type};
 
 #[derive(Default, Debug)]
 pub struct Symbols {
-    pub vars: HashMap<Name, Sym>,
-    pub fns: HashMap<Name, FnSym>,
-    pub structs: HashMap<Name, StructSym>,
-    pub enums: HashMap<Name, EnumSym>,
+    pub vars: IndexMap<Name, Sym>,
+    pub fns: IndexMap<Name, FnSym>,
+    pub structs: IndexMap<Name, StructSym>,
+    pub enums: IndexMap<Name, EnumSym>,
 }
 
 impl Symbols {

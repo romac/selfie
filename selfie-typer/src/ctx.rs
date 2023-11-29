@@ -1,6 +1,7 @@
 use core::fmt;
-use std::collections::HashMap;
 use std::hash::Hasher;
+
+use indexmap::IndexMap;
 
 use selfie_ast::symbols::Symbols;
 use selfie_ast::{EnumDecl, Expr, FnDecl, StructDecl, Sym};
@@ -24,22 +25,22 @@ impl ExprId {
 
 pub struct TyCtx {
     _syms: Symbols,
-    vars: HashMap<Sym, Type>,
-    fns: HashMap<Sym, FnType>,
-    structs: HashMap<Sym, StructType>,
-    enums: HashMap<Sym, EnumType>,
-    exprs: HashMap<ExprId, Type>,
+    vars: IndexMap<Sym, Type>,
+    fns: IndexMap<Sym, FnType>,
+    structs: IndexMap<Sym, StructType>,
+    enums: IndexMap<Sym, EnumType>,
+    exprs: IndexMap<ExprId, Type>,
 }
 
 impl TyCtx {
     pub fn new(_syms: Symbols) -> Self {
         Self {
             _syms,
-            vars: HashMap::new(),
-            fns: HashMap::new(),
-            structs: HashMap::new(),
-            enums: HashMap::new(),
-            exprs: HashMap::new(),
+            vars: IndexMap::new(),
+            fns: IndexMap::new(),
+            structs: IndexMap::new(),
+            enums: IndexMap::new(),
+            exprs: IndexMap::new(),
         }
     }
 

@@ -1,5 +1,4 @@
 use core::fmt;
-use std::collections::HashMap;
 
 use indexmap::IndexMap;
 
@@ -95,5 +94,5 @@ pub struct StructType {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct EnumType {
-    pub variants: HashMap<Sym, Option<Type>>,
+    pub variants: IndexMap<Sym, Option<Type>>,
 }
