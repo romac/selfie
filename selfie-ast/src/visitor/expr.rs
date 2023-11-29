@@ -23,17 +23,17 @@ pub trait ExprVisitor {
         }
     }
 
-    fn visit_return(&mut self, expr: &Expr) {
-        self.visit_expr(expr);
-    }
-
     fn visit_let(&mut self, let_: &Let) {
         self.visit_expr(&let_.value);
         self.visit_expr(&let_.body);
     }
 
-    fn visit_field_access(&mut self, field: &FieldAccess) {
+    fn visit_field_select(&mut self, field: &FieldSelect) {
         self.visit_expr(&field.expr);
+    }
+
+    fn visit_tuple_select(&mut self, tuple: &TupleSelect) {
+        self.visit_expr(&tuple.expr);
     }
 
     fn visit_unary_op(&mut self, op: &UnaryOp) {
@@ -86,7 +86,8 @@ where
         Expr::Var(var) => visitor.visit_var(var),
         Expr::FnCall(call) => visitor.visit_fn_call(call),
         Expr::MethodCall(call) => visitor.visit_method_call(call),
-        Expr::FieldAccess(field) => visitor.visit_field_access(field),
+        Expr::FieldSelect(field) => visitor.visit_field_select(field),
+        Expr::TupleSelect(tuple) => visitor.visit_tuple_select(tuple),
         Expr::Tuple(tuple) => visitor.visit_tuple(tuple),
         Expr::Let(let_) => visitor.visit_let(let_),
         Expr::UnaryOp(op) => visitor.visit_unary_op(op),
@@ -94,7 +95,6 @@ where
         Expr::If(if_) => visitor.visit_if(if_),
         Expr::StructInit(init) => visitor.visit_struct_init(init),
         Expr::EnumInit(init) => visitor.visit_enum_init(init),
-        Expr::Return(expr) => visitor.visit_return(expr),
     }
 }
 
@@ -121,17 +121,17 @@ pub trait ExprVisitorMut {
         }
     }
 
-    fn visit_return(&mut self, expr: &mut Expr) {
-        self.visit_expr(expr);
-    }
-
     fn visit_let(&mut self, let_: &mut Let) {
         self.visit_expr(&mut let_.value);
         self.visit_expr(&mut let_.body);
     }
 
-    fn visit_field_access(&mut self, field: &mut FieldAccess) {
+    fn visit_field_select(&mut self, field: &mut FieldSelect) {
         self.visit_expr(&mut field.expr);
+    }
+
+    fn visit_tuple_select(&mut self, tuple: &mut TupleSelect) {
+        self.visit_expr(&mut tuple.expr);
     }
 
     fn visit_unary_op(&mut self, op: &mut UnaryOp) {
@@ -184,7 +184,8 @@ where
         Expr::Var(var) => visitor.visit_var(var),
         Expr::FnCall(call) => visitor.visit_fn_call(call),
         Expr::MethodCall(call) => visitor.visit_method_call(call),
-        Expr::FieldAccess(field) => visitor.visit_field_access(field),
+        Expr::FieldSelect(field) => visitor.visit_field_select(field),
+        Expr::TupleSelect(tuple) => visitor.visit_tuple_select(tuple),
         Expr::Tuple(tuple) => visitor.visit_tuple(tuple),
         Expr::Let(let_) => visitor.visit_let(let_),
         Expr::UnaryOp(op) => visitor.visit_unary_op(op),
@@ -192,6 +193,5 @@ where
         Expr::If(if_) => visitor.visit_if(if_),
         Expr::StructInit(init) => visitor.visit_struct_init(init),
         Expr::EnumInit(init) => visitor.visit_enum_init(init),
-        Expr::Return(expr) => visitor.visit_return(expr),
     }
 }

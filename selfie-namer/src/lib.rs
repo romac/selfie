@@ -1,18 +1,16 @@
 //! Namer for the Selfie language
 
-use scope::{EnumSym, FnSym, StructSym};
+use std::collections::HashSet;
+
+use selfie_ast::symbols::{EnumSym, FnSym, StructSym, Symbols, VariantSym};
 use selfie_ast::visitor::{ExprVisitorMut, TypeVisitorMut};
 use selfie_ast::*;
-use std::collections::HashSet;
 
 mod error;
 pub use error::Error;
 
 mod scope_stack;
 use scope_stack::ScopeStack;
-
-mod scope;
-pub use scope::Scope;
 
 #[derive(Default, Debug)]
 pub struct Ids {
@@ -32,8 +30,10 @@ impl Ids {
     }
 }
 
-pub fn name_program(program: &mut Program) -> Result<ScopeStack, Vec<Error>> {
-    Namer::new().name_program(program)
+pub fn name_program(program: &mut Program) -> Result<Symbols, Vec<Error>> {
+    Namer::new()
+        .name_program(program)
+        .map(|stack| stack.into_global())
 }
 
 #[derive(Debug)]
@@ -88,15 +88,21 @@ impl Namer {
 
         for decl in &mut module.decls {
             if let Decl::Fn(fn_decl) = decl {
-                self.name_fn_body(fn_decl)
+                self.name_fn(fn_decl)
             }
         }
     }
 
-    fn name_fn_body(&mut self, fn_decl: &mut FnDecl) {
+    fn name_fn(&mut self, fn_decl: &mut FnDecl) {
+        self.name_type(&mut fn_decl.return_type);
+
+        for param in &mut fn_decl.params {
+            self.name_type(&mut param.ty);
+        }
+
         let fn_scope = self.scope.get_fn(&fn_decl.sym.name).unwrap();
 
-        let mut expr_scope = Scope::default();
+        let mut expr_scope = Symbols::default();
         for (param, (sym, _)) in &fn_scope.params {
             expr_scope.vars.insert(*param, *sym);
         }
@@ -178,9 +184,15 @@ impl Namer {
         for variant in &mut enum_decl.variants {
             self.ids.freshen(&mut variant.sym);
 
+            let variant_sym = VariantSym {
+                sym: variant.sym,
+                span: variant.span,
+                ty: variant.ty.clone(),
+            };
+
             let duplicate = enum_sym
                 .variants
-                .insert(variant.sym.name, variant.sym)
+                .insert(variant.sym.name, variant_sym)
                 .is_some();
 
             if duplicate {
@@ -346,7 +358,7 @@ impl<'a> ExprVisitorMut for NameExprVisitor<'a> {
         self.scope.pop_scope();
     }
 
-    fn visit_field_access(&mut self, field: &mut FieldAccess) {
+    fn visit_field_select(&mut self, field: &mut FieldSelect) {
         self.visit_expr(&mut field.expr);
     }
 
@@ -389,30 +401,47 @@ impl<'a> ExprVisitorMut for NameExprVisitor<'a> {
     }
 
     fn visit_enum_init(&mut self, init: &mut EnumInit) {
-        if let Some(sym) = init.sym {
-            match self.scope.get_enum(&sym.name) {
-                None => {
-                    self.errors.push(Error::UnknownType(init.span, sym));
+        let Some(sym) = init.sym else { return };
+
+        let Some(enum_sym) = self.scope.get_enum(&sym.name) else {
+            self.errors.push(Error::UnknownType(init.span, sym));
+            return;
+        };
+
+        init.sym = Some(enum_sym.sym);
+
+        if let Some(variant_sym) = enum_sym.variants.get(&init.variant.name) {
+            init.variant = variant_sym.sym;
+
+            match (&mut init.arg, &variant_sym.ty) {
+                (Some(_), None) => {
+                    self.errors.push(Error::UnexpectedVariantArg(
+                        init.span(),
+                        enum_sym.clone(),
+                        init.variant,
+                    ));
                 }
 
-                Some(enum_sym) => {
-                    init.sym = Some(enum_sym.sym);
-
-                    if let Some(variant_sym) = enum_sym.variants.get(&init.variant.name) {
-                        init.variant = *variant_sym;
-                    } else {
-                        self.errors.push(Error::UnknownVariant(
-                            init.span(),
-                            enum_sym.clone(),
-                            init.variant,
-                        ));
-                    }
+                (None, Some(_)) => {
+                    self.errors.push(Error::MissingVariantArg(
+                        init.span(),
+                        enum_sym.clone(),
+                        init.variant,
+                    ));
                 }
+
+                (Some(arg), Some(_)) => {
+                    self.visit_expr(arg.as_mut());
+                }
+
+                (None, None) => {}
             }
-        }
-
-        if let Some(arg) = &mut init.arg {
-            self.visit_expr(arg);
+        } else {
+            self.errors.push(Error::UnknownVariant(
+                init.span(),
+                enum_sym.clone(),
+                init.variant,
+            ));
         }
     }
 }

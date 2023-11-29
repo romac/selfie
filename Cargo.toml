@@ -7,6 +7,7 @@ members = [
   "selfie-ast",
   "selfie-parser",
   "selfie-namer",
+  "selfie-typer",
 ]
 
 [workspace.package]
@@ -16,8 +17,10 @@ edition = "2021"
 [workspace.dependencies]
 ariadne           = { version = "0.3", features = ["auto-color"] }
 chumsky           = { version = "1.0.0-alpha.6", features = ["label", "pratt"] }
+indexmap          = "2.1.0"
+itertools         = "0.12.0"
 logos             = "0.13"
 ordered-float     = "4"
 pretty_assertions = "1"
 thiserror         = "1"
-ustr             = "0.10"
+ustr              = "0.10"

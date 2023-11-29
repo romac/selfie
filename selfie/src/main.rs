@@ -5,9 +5,10 @@ use thiserror::Error;
 
 use selfie::ast::Program;
 use selfie::lexer::Error as LexError;
-use selfie::namer::Error as NamerError;
+use selfie::namer::Error as NameError;
 use selfie::parser::Error as ParseError;
 use selfie::report::*;
+use selfie::typer::Error as TypeError;
 
 fn main() {
     if let Err(e) = run() {
@@ -24,8 +25,11 @@ pub enum Error {
     #[error("parse error")]
     Parse(ParseError),
 
-    #[error("namer error")]
-    Namer(Box<NamerError>),
+    #[error("name error")]
+    Name(Box<NameError>),
+
+    #[error("type error")]
+    Type(Box<TypeError>),
 }
 
 fn run() -> Result<(), Box<dyn std::error::Error>> {
@@ -58,20 +62,37 @@ fn pipeline(input: &str, path: &Path) -> Result<(), Vec<Error>> {
         modules: vec![module],
     };
 
-    let cg = program.build_call_graph();
-
-    for fn_decl in program.fns() {
-        dbg!(cg.build_fn_info(fn_decl.sym));
-    }
+    println!("=== Namer ===\n\n");
 
     let syms = selfie::namer::name_program(&mut program).map_err(|errs| {
         errs.into_iter()
-            .map(|e| Error::Namer(Box::new(e)))
+            .map(|e| Error::Name(Box::new(e)))
             .collect::<Vec<_>>()
     })?;
 
     println!("=== Namer - Symbols ===\n{syms:#?}\n");
     println!("=== Namer - Program ===\n{program:#?}\n");
+
+    // let cg = program.build_call_graph();
+    //
+    // for fn_decl in program.fns() {
+    //     println!(
+    //         "=== Function - {} ===\n{:#?}\n",
+    //         fn_decl.sym,
+    //         cg.build_fn_info(fn_decl.sym)
+    //     );
+    // }
+
+    println!("=== Typer ===\n\n");
+
+    let ty_ctx = selfie::typer::type_program(&mut program, syms).map_err(|errs| {
+        errs.into_iter()
+            .map(|e| Error::Type(Box::new(e)))
+            .collect::<Vec<_>>()
+    })?;
+
+    println!("=== Typer - Context ===\n{ty_ctx:#?}\n");
+    println!("=== Typer - Program ===\n{program:#?}\n");
 
     Ok(())
 }
@@ -83,7 +104,8 @@ fn print_errors(path: &Path, input: &str, errors: Vec<Error>) {
         let report = match e {
             Error::Lex(e) => report_lex_error(&e, &id),
             Error::Parse(e) => report_parse_error(&e, &id),
-            Error::Namer(e) => report_namer_error(&e, &id),
+            Error::Name(e) => report_name_error(&e, &id),
+            Error::Type(e) => report_typer_error(&e, &id),
         };
 
         let _ = report.eprint((id.clone(), Source::from(input)));

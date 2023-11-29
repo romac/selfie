@@ -9,6 +9,7 @@ selfie-ast    = { path = "../selfie-ast" }
 selfie-lexer  = { path = "../selfie-lexer" }
 selfie-parser = { path = "../selfie-parser" }
 selfie-namer  = { path = "../selfie-namer" }
+selfie-typer  = { path = "../selfie-typer" }
 
 ariadne.workspace       = true
 chumsky.workspace       = true
