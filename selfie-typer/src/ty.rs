@@ -1,6 +1,8 @@
 use core::fmt;
 use std::collections::HashMap;
 
+use indexmap::IndexMap;
+
 use selfie_ast::Sym;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -88,7 +90,7 @@ impl FnType {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct StructType {
-    pub fields: HashMap<Sym, Type>,
+    pub fields: IndexMap<Sym, Type>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

@@ -8,3 +8,4 @@ edition.workspace = true
 selfie-ast = { path = "../selfie-ast" }
 
 thiserror.workspace = true
+indexmap.workspace  = true
