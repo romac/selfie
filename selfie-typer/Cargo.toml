@@ -1,5 +1,5 @@
 [package]
-name = "selfie-namer"
+name = "selfie-typer"
 
 version.workspace = true
 edition.workspace = true
@@ -7,6 +7,4 @@ edition.workspace = true
 [dependencies]
 selfie-ast = { path = "../selfie-ast" }
 
-indexmap.workspace  = true
-itertools.workspace = true
 thiserror.workspace = true

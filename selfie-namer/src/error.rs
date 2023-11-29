@@ -1,8 +1,8 @@
 use itertools::Itertools;
-use selfie_ast::{Name, Span, Sym};
 use thiserror::Error;
 
-use crate::scope::{EnumSym, FnSym, StructSym};
+use selfie_ast::symbols::{EnumSym, FnSym, StructSym};
+use selfie_ast::{Name, Span, Sym};
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -53,6 +53,12 @@ pub enum Error {
 
     #[error("wrong argument label for `{2}`, expected `{3}`")]
     WrongArgLabel(Span, FnSym, Sym, Sym),
+
+    #[error("missing argument for variant `{2}`")]
+    MissingVariantArg(Span, EnumSym, Sym),
+
+    #[error("enum variant `{}.{2}` does not take any argument", .1.sym)]
+    UnexpectedVariantArg(Span, EnumSym, Sym),
 }
 
 fn show_variants(enum_sym: &EnumSym) -> String {
@@ -82,6 +88,8 @@ impl Error {
             Self::MissingField(span, _, _) => *span,
             Self::UnknownField(span, _, _) => *span,
             Self::WrongArgLabel(span, _, _, _) => *span,
+            Self::MissingVariantArg(span, _, _) => *span,
+            Self::UnexpectedVariantArg(span, _, _) => *span,
         }
     }
 

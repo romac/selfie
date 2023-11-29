@@ -1,4 +1,5 @@
 TODO:
 
-- [ast, parser] Replace FieldAccess, FnCall, MethodCall, EnumInit and StructInit with a single Call and Select variant
+- [ast, parser] Replace FieldSelect, FnCall, MethodCall, EnumInit and StructInit with a single Call and Select variant
   - Disambiguate after typing
+- Add an ExprId to all exprs

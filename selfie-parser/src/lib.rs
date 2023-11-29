@@ -280,7 +280,7 @@ pub fn parse_atom(expr: impl Parser<Expr>) -> impl Parser<Expr> {
         parse_var().map(Expr::Var),
     ));
 
-    parse_field_access_or_method_call(init, expr)
+    parse_field_select_or_method_call(init, expr)
 }
 
 pub fn parse_lit() -> impl Parser<Literal> {
@@ -298,30 +298,43 @@ pub fn parse_lit() -> impl Parser<Literal> {
     choice((other, unit))
 }
 
-pub fn parse_field_access_or_method_call(
+pub fn parse_field_select_or_method_call(
     init: impl Parser<Expr>,
     expr: impl Parser<Expr>,
 ) -> impl Parser<Expr> {
     use chumsky::span::Span as _;
 
     enum MF {
-        FieldAccess(Sym, Span),
+        FieldSelect(Sym, Span),
+        TupleSelect(u16, Span),
         MethodCall(Sym, Vec<Arg>, Span),
+    }
+
+    fn parse_tuple_idx() -> impl Parser<u16> {
+        select! {
+            Token::Int64(i) if i >= 0 && i < u16::MAX as i64 => i as u16,
+        }
     }
 
     let mf = choice((
         parse_fn_call(expr.clone())
             .map_with(|call, meta| MF::MethodCall(call.sym, call.args, meta.span())),
-        parse_lower().map_with(|sym, meta| MF::FieldAccess(sym, meta.span())),
+        parse_lower().map_with(|sym, meta| MF::FieldSelect(sym, meta.span())),
+        parse_tuple_idx().map_with(|idx, meta| MF::TupleSelect(idx, meta.span())),
     ));
 
     init.foldl(
         just(Token::Dot).ignore_then(mf).repeated(),
         |expr, mf| match mf {
-            MF::FieldAccess(sym, span) => Expr::FieldAccess(FieldAccess {
+            MF::FieldSelect(sym, span) => Expr::FieldSelect(FieldSelect {
                 span: expr.span().union(span),
                 expr: Box::new(expr),
                 sym,
+            }),
+            MF::TupleSelect(index, span) => Expr::TupleSelect(TupleSelect {
+                span: expr.span().union(span),
+                expr: Box::new(expr),
+                index,
             }),
             MF::MethodCall(sym, args, span) => Expr::MethodCall(MethodCall {
                 span: expr.span().union(span),
@@ -362,6 +375,7 @@ pub fn parse_let(expr: impl Parser<Expr>) -> impl Parser<Let> {
         .ignore_then(parse_lower())
         .then_ignore(just(Token::Equal))
         .then(expr.clone())
+        .then_ignore(just(Token::Semi).or_not())
         .then(expr.clone())
         .map_with(|((sym, value), body), meta| Let {
             sym,

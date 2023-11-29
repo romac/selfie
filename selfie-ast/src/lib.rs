@@ -21,6 +21,8 @@ pub use sym::Sym;
 mod ty;
 pub use ty::Type;
 
+pub mod symbols;
+
 pub mod utils;
 pub mod visitor;
 
@@ -82,7 +84,8 @@ pub enum Expr {
     Var(Var),
     FnCall(FnCall),
     MethodCall(MethodCall),
-    FieldAccess(FieldAccess),
+    FieldSelect(FieldSelect),
+    TupleSelect(TupleSelect),
     Tuple(Tuple),
     Let(Let),
     UnaryOp(UnaryOp),
@@ -90,7 +93,6 @@ pub enum Expr {
     If(If),
     StructInit(StructInit),
     EnumInit(EnumInit),
-    Return(Box<Expr>),
 }
 
 impl Expr {
@@ -100,7 +102,8 @@ impl Expr {
             Self::Var(var) => var.span(),
             Self::FnCall(call) => call.span(),
             Self::MethodCall(call) => call.span(),
-            Self::FieldAccess(field) => field.span(),
+            Self::FieldSelect(field) => field.span(),
+            Self::TupleSelect(tuple) => tuple.span(),
             Self::Tuple(tuple) => tuple.span(),
             Self::Let(let_) => let_.span(),
             Self::UnaryOp(op) => op.span(),
@@ -108,7 +111,6 @@ impl Expr {
             Self::If(if_) => if_.span(),
             Self::StructInit(init) => init.span(),
             Self::EnumInit(init) => init.span(),
-            Self::Return(expr) => expr.span(),
         }
     }
 }
@@ -124,6 +126,20 @@ impl Arg {
         match self {
             Self::Named(arg) => arg.span(),
             Self::Anon(expr) => expr.span(),
+        }
+    }
+
+    pub fn expr(&self) -> &Expr {
+        match self {
+            Self::Named(arg) => &arg.value,
+            Self::Anon(expr) => expr,
+        }
+    }
+
+    pub fn expr_mut(&mut self) -> &mut Expr {
+        match self {
+            Self::Named(arg) => &mut arg.value,
+            Self::Anon(expr) => expr,
         }
     }
 }
@@ -189,10 +205,17 @@ pub struct MethodCall {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct FieldAccess {
+pub struct FieldSelect {
     pub span: Span,
     pub expr: Box<Expr>,
     pub sym: Sym,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct TupleSelect {
+    pub span: Span,
+    pub expr: Box<Expr>,
+    pub index: u16,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -240,7 +263,8 @@ impl_span!(
     UnaryOp,
     FnCall,
     MethodCall,
-    FieldAccess,
+    FieldSelect,
+    TupleSelect,
     Let,
     If,
     StructInit,
@@ -248,4 +272,4 @@ impl_span!(
     Tuple
 );
 
-impl_sym!(Module, Var, NamedArg, FnCall, MethodCall, FieldAccess, Let);
+impl_sym!(Module, Var, NamedArg, FnCall, MethodCall, FieldSelect, Let);

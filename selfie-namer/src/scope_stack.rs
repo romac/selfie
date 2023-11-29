@@ -1,30 +1,29 @@
 use selfie_ast::{Name, Sym};
 
-use crate::scope::{EnumSym, FnSym, StructSym};
-use crate::Scope;
+use selfie_ast::symbols::{EnumSym, FnSym, StructSym, Symbols};
 
 #[derive(Debug)]
 pub struct ScopeStack {
-    scopes: Vec<Scope>,
+    scopes: Vec<Symbols>,
 }
 
 impl ScopeStack {
     pub fn new() -> Self {
         Self {
-            scopes: vec![Scope::default()],
+            scopes: vec![Symbols::default()],
         }
     }
 
-    pub fn push_new_scope(&mut self) -> &mut Scope {
-        self.push_scope(Scope::default())
+    pub fn push_new_scope(&mut self) -> &mut Symbols {
+        self.push_scope(Symbols::default())
     }
 
-    pub fn push_scope(&mut self, scope: Scope) -> &mut Scope {
+    pub fn push_scope(&mut self, scope: Symbols) -> &mut Symbols {
         self.scopes.push(scope);
         self.current_scope_mut()
     }
 
-    pub fn pop_scope(&mut self) -> Scope {
+    pub fn pop_scope(&mut self) -> Symbols {
         debug_assert!(!self.scopes.is_empty());
 
         if self.scopes.len() == 1 {
@@ -40,13 +39,13 @@ impl ScopeStack {
         self.pop_scope();
     }
 
-    pub fn current_scope(&self) -> &Scope {
+    pub fn current_scope(&self) -> &Symbols {
         debug_assert!(!self.scopes.is_empty());
 
         self.scopes.last().expect("no scopes")
     }
 
-    pub fn current_scope_mut(&mut self) -> &mut Scope {
+    pub fn current_scope_mut(&mut self) -> &mut Symbols {
         debug_assert!(!self.scopes.is_empty());
 
         self.scopes.last_mut().expect("no scopes")
@@ -98,6 +97,10 @@ impl ScopeStack {
             .iter()
             .rev()
             .find_map(|scope| scope.get_enum(name))
+    }
+
+    pub fn into_global(mut self) -> Symbols {
+        self.scopes.swap_remove(0)
     }
 }
 

@@ -7,4 +7,5 @@ edition.workspace = true
 [dependencies]
 chumsky.workspace       = true
 ordered-float.workspace = true
+indexmap.workspace      = true
 ustr.workspace          = true

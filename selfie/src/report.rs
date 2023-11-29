@@ -2,11 +2,13 @@ use std::ops::Range;
 
 use ariadne::{Color, ColorGenerator, Fmt, Label, Report, ReportKind};
 use chumsky::error::RichPattern;
+
 use selfie_lexer::Token;
 
 use crate::lexer::Error as LexError;
-use crate::namer::Error as NamerError;
+use crate::namer::Error as NameError;
 use crate::parser::Error as ParseError;
+use crate::typer::Error as TypeError;
 
 pub type ReportSpan = (String, Range<usize>);
 
@@ -28,6 +30,26 @@ pub fn report_lex_error<'a>(e: &LexError, id: &str) -> Report<'a, ReportSpan> {
 }
 
 pub fn report_parse_error<'a>(e: &ParseError, id: &str) -> Report<'a, ReportSpan> {
+    fn fmt_expected<'a>(
+        tokens: impl ExactSizeIterator<Item = &'a RichPattern<'a, Token>>,
+        color: Color,
+    ) -> String {
+        tokens
+            .map(|t| match t {
+                RichPattern::Token(t) => t.fg(color).to_string(),
+                RichPattern::Label(l) => l.fg(color).to_string(),
+                RichPattern::EndOfInput => "end of input".to_string(),
+            })
+            .collect::<Vec<_>>()
+            .join(", ")
+    }
+
+    fn fmt_found(token: Option<&Token>) -> String {
+        token
+            .map(|t| t.to_string())
+            .unwrap_or_else(|| "end of input".to_string())
+    }
+
     let mut colors = ColorGenerator::new();
     let fg1 = colors.next();
     let fg2 = colors.next();
@@ -64,7 +86,7 @@ pub fn report_parse_error<'a>(e: &ParseError, id: &str) -> Report<'a, ReportSpan
     report.finish()
 }
 
-pub fn report_namer_error<'a>(e: &NamerError, id: &str) -> Report<'a, ReportSpan> {
+pub fn report_name_error<'a>(e: &NameError, id: &str) -> Report<'a, ReportSpan> {
     let mut colors = ColorGenerator::new();
     let fg = colors.next();
 
@@ -90,22 +112,28 @@ pub fn report_namer_error<'a>(e: &NamerError, id: &str) -> Report<'a, ReportSpan
     report.finish()
 }
 
-fn fmt_expected<'a>(
-    tokens: impl ExactSizeIterator<Item = &'a RichPattern<'a, Token>>,
-    color: Color,
-) -> String {
-    tokens
-        .map(|t| match t {
-            RichPattern::Token(t) => t.fg(color).to_string(),
-            RichPattern::Label(l) => l.fg(color).to_string(),
-            RichPattern::EndOfInput => "end of input".to_string(),
-        })
-        .collect::<Vec<_>>()
-        .join(", ")
-}
+pub fn report_typer_error<'a>(e: &TypeError, id: &str) -> Report<'a, ReportSpan> {
+    let mut colors = ColorGenerator::new();
+    let fg = colors.next();
 
-fn fmt_found(token: Option<&Token>) -> String {
-    token
-        .map(|t| t.to_string())
-        .unwrap_or_else(|| "end of input".to_string())
+    let span = e.span();
+
+    let mut report = Report::build(ReportKind::Error, id.to_string(), span.start)
+        .with_code(3)
+        .with_message(e.header())
+        .with_label(
+            Label::new((id.to_string(), span.start..span.end))
+                .with_message(e.to_string())
+                .with_color(fg),
+        );
+
+    if let Some(note) = e.note() {
+        report.set_note(note);
+    }
+
+    if let Some(help) = e.help() {
+        report.set_help(help);
+    }
+
+    report.finish()
 }

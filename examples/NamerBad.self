@@ -39,3 +39,13 @@ fn tata(_ x: Bool): Bool {
 fn tutu(): Bool {
   tete() && tutu()
 }
+
+enum MyBool {
+  .myTrue
+  .myFalse
+}
+
+fn myBoolBad3(): MyBool {
+  MyBool.myTrue(32)
+}
+

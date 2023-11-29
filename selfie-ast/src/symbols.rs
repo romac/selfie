@@ -1,70 +1,18 @@
 use std::collections::HashMap;
 
 use indexmap::IndexMap;
-use selfie_ast::{Name, ParamKind, Span, Sym};
 
-#[derive(Clone, Debug)]
-pub struct FnSym {
-    pub sym: Sym,
-    pub span: Span,
-    pub params: IndexMap<Name, (Sym, ParamKind)>,
-    pub aliases: IndexMap<Name, Sym>,
-}
-
-impl FnSym {
-    pub fn new(sym: Sym, span: Span) -> Self {
-        Self {
-            sym,
-            span,
-            params: IndexMap::new(),
-            aliases: IndexMap::new(),
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct StructSym {
-    pub sym: Sym,
-    pub span: Span,
-    pub fields: IndexMap<Name, Sym>,
-}
-
-impl StructSym {
-    pub fn new(sym: Sym, span: Span) -> Self {
-        Self {
-            sym,
-            span,
-            fields: IndexMap::new(),
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct EnumSym {
-    pub sym: Sym,
-    pub span: Span,
-    pub variants: IndexMap<Name, Sym>,
-}
-
-impl EnumSym {
-    pub fn new(sym: Sym, span: Span) -> Self {
-        Self {
-            sym,
-            span,
-            variants: IndexMap::new(),
-        }
-    }
-}
+use crate::{Name, ParamKind, Span, Sym, Type};
 
 #[derive(Default, Debug)]
-pub struct Scope {
+pub struct Symbols {
     pub vars: HashMap<Name, Sym>,
     pub fns: HashMap<Name, FnSym>,
     pub structs: HashMap<Name, StructSym>,
     pub enums: HashMap<Name, EnumSym>,
 }
 
-impl Scope {
+impl Symbols {
     pub fn add_var(&mut self, sym: Sym) {
         self.vars.insert(sym.name, sym);
     }
@@ -111,5 +59,65 @@ impl Scope {
 
     pub fn get_enum_mut(&mut self, name: &Name) -> Option<&mut EnumSym> {
         self.enums.get_mut(name)
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct FnSym {
+    pub sym: Sym,
+    pub span: Span,
+    pub params: IndexMap<Name, (Sym, ParamKind)>,
+    pub aliases: IndexMap<Name, Sym>,
+}
+
+impl FnSym {
+    pub fn new(sym: Sym, span: Span) -> Self {
+        Self {
+            sym,
+            span,
+            params: IndexMap::new(),
+            aliases: IndexMap::new(),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct StructSym {
+    pub sym: Sym,
+    pub span: Span,
+    pub fields: IndexMap<Name, Sym>,
+}
+
+impl StructSym {
+    pub fn new(sym: Sym, span: Span) -> Self {
+        Self {
+            sym,
+            span,
+            fields: IndexMap::new(),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct VariantSym {
+    pub sym: Sym,
+    pub span: Span,
+    pub ty: Option<Type>,
+}
+
+#[derive(Clone, Debug)]
+pub struct EnumSym {
+    pub sym: Sym,
+    pub span: Span,
+    pub variants: IndexMap<Name, VariantSym>,
+}
+
+impl EnumSym {
+    pub fn new(sym: Sym, span: Span) -> Self {
+        Self {
+            sym,
+            span,
+            variants: IndexMap::new(),
+        }
     }
 }
