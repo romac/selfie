@@ -17,6 +17,7 @@ pub enum Type {
 }
 
 impl Type {
+    #[must_use]
     pub fn span(&self) -> Span {
         match self {
             Type::Int64(span) => *span,
