@@ -1,3 +1,4 @@
+use core::fmt;
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -52,6 +53,26 @@ pub enum DebugSection {
     CallGraph,
 }
 
+const DEBUG_SECTIONS: &[DebugSection] = &[
+    DebugSection::Lex,
+    DebugSection::Parse,
+    DebugSection::Name,
+    DebugSection::Type,
+    DebugSection::CallGraph,
+];
+
+impl fmt::Display for DebugSection {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Lex => write!(f, "lex"),
+            Self::Parse => write!(f, "parse"),
+            Self::Name => write!(f, "name"),
+            Self::Type => write!(f, "type"),
+            Self::CallGraph => write!(f, "call-graph"),
+        }
+    }
+}
+
 impl FromStr for DebugSection {
     type Err = String;
 
@@ -62,7 +83,18 @@ impl FromStr for DebugSection {
             "name" => Ok(Self::Name),
             "type" => Ok(Self::Type),
             "call-graph" => Ok(Self::CallGraph),
-            _ => Err(format!("unknown debug section: {s}")),
+
+            _ => {
+                let available = DEBUG_SECTIONS
+                    .iter()
+                    .map(|s| s.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ");
+
+                Err(format!(
+                    "unknown debug section '{s}', available: {available}"
+                ))
+            }
         }
     }
 }
