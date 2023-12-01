@@ -8,6 +8,7 @@ members = [
   "selfie-parser",
   "selfie-namer",
   "selfie-typer",
+  "selfie-lsp",
 ]
 
 exclude = [
