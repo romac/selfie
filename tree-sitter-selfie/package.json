@@ -22,7 +22,7 @@
       "file-types": [
         "self"
       ],
-      "highlights": "highlights.scm"
+      "highlights": "queries/highlights.scm"
     }
   ]
 }
