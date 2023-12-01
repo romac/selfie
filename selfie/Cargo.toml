@@ -13,6 +13,7 @@ selfie-typer  = { path = "../selfie-typer" }
 
 ariadne.workspace       = true
 chumsky.workspace       = true
+clap.workspace          = true
 ordered-float.workspace = true
 thiserror.workspace     = true
 
