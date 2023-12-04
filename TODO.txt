@@ -2,4 +2,5 @@ TODO:
 
 - [ast, parser] Replace FieldSelect, FnCall, MethodCall, EnumInit and StructInit with a single Call and Select variant
   - Disambiguate after typing
-- Add an ExprId to all exprs
+- [ast, parser] Add an ExprId to all exprs
+- [namer] Use parameters names in function symbol to allow for functions with same name but different parameters
