@@ -116,6 +116,9 @@ pub enum Token {
     #[token("enum")]
     Enum,
 
+    #[token("match")]
+    Match,
+
     #[token("let")]
     Let,
 
@@ -151,6 +154,9 @@ pub enum Token {
 
     #[token("->")]
     Arrow,
+
+    #[token("=>")]
+    FatArrow,
 
     #[token("_")]
     Under,
@@ -222,6 +228,7 @@ impl fmt::Display for Token {
             Fn => write!(f, "fn"),
             Struct => write!(f, "struct"),
             Enum => write!(f, "enum"),
+            Match => write!(f, "match"),
             Let => write!(f, "let"),
             If => write!(f, "if"),
             Else => write!(f, "else"),
@@ -234,6 +241,7 @@ impl fmt::Display for Token {
             Comma => write!(f, ","),
             Dot => write!(f, "."),
             Arrow => write!(f, "->"),
+            FatArrow => write!(f, "=>"),
             Under => write!(f, "_"),
             Slash => write!(f, "/"),
             Star => write!(f, "*"),

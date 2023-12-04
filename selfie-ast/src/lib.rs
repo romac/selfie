@@ -87,6 +87,7 @@ pub enum Expr {
     FieldSelect(FieldSelect),
     TupleSelect(TupleSelect),
     Tuple(Tuple),
+    Match(Match),
     Let(Let),
     UnaryOp(UnaryOp),
     BinaryOp(BinaryOp),
@@ -105,6 +106,7 @@ impl Expr {
             Self::FieldSelect(field) => field.span(),
             Self::TupleSelect(tuple) => tuple.span(),
             Self::Tuple(tuple) => tuple.span(),
+            Self::Match(match_) => match_.span(),
             Self::Let(let_) => let_.span(),
             Self::UnaryOp(op) => op.span(),
             Self::BinaryOp(op) => op.span(),
@@ -219,6 +221,47 @@ pub struct TupleSelect {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Match {
+    pub span: Span,
+    pub scrut: Box<Expr>,
+    pub cases: Vec<MatchCase>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct MatchCase {
+    pub span: Span,
+    pub pattern: Pattern,
+    pub expr: Expr,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum Pattern {
+    Wildcard(Span),
+    Var(Var),
+    // Tuple(TuplePattern),
+    // Struct(StructPattern),
+    Enum(EnumPattern),
+}
+
+impl Pattern {
+    pub fn span(&self) -> Span {
+        match self {
+            Self::Wildcard(span) => *span,
+            Self::Var(var) => var.span(),
+            Self::Enum(enum_) => enum_.span(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct EnumPattern {
+    pub span: Span,
+    pub ty: Option<Sym>,
+    pub variant: Sym,
+    pub arg: Option<Box<Pattern>>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Let {
     pub span: Span,
     pub sym: Sym,
@@ -244,7 +287,7 @@ pub struct StructInit {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct EnumInit {
     pub span: Span,
-    pub sym: Option<Sym>,
+    pub ty: Option<Sym>,
     pub variant: Sym,
     pub arg: Option<Box<Expr>>,
 }
@@ -269,7 +312,10 @@ impl_span!(
     If,
     StructInit,
     EnumInit,
-    Tuple
+    Tuple,
+    Match,
+    MatchCase,
+    EnumPattern
 );
 
 impl_sym!(Module, Var, NamedArg, FnCall, MethodCall, FieldSelect, Let);

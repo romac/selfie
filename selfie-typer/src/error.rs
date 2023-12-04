@@ -29,6 +29,14 @@ pub enum Error {
 
     #[error("index {index} out of bounds for tuple `{ty}`")]
     TupleIndexOutOfBounds { span: Span, index: u16, ty: Type },
+
+    #[error("expected {expected}, found {actual}")]
+    MismatchedMatchArms {
+        span: Span,
+        first_span: Span,
+        expected: Type,
+        actual: Type,
+    },
 }
 
 impl Error {
@@ -47,6 +55,7 @@ impl Error {
                 "cannot select numeric index on non-tuple".to_string()
             }
             Error::TupleIndexOutOfBounds { .. } => "tuple index out of bounds".to_string(),
+            Error::MismatchedMatchArms { .. } => "mismatched match arms".to_string(),
         }
     }
 
@@ -59,6 +68,7 @@ impl Error {
             Error::AmbiguousEnumVariant { span, .. } => *span,
             Error::ExpectedTupleType { span, .. } => *span,
             Error::TupleIndexOutOfBounds { span, .. } => *span,
+            Error::MismatchedMatchArms { span, .. } => *span,
         }
     }
 

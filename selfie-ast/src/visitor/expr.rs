@@ -23,6 +23,18 @@ pub trait ExprVisitor {
         }
     }
 
+    fn visit_match(&mut self, match_: &Match) {
+        self.visit_expr(&match_.scrut);
+
+        for case in &match_.cases {
+            self.visit_match_case(case);
+        }
+    }
+
+    fn visit_match_case(&mut self, case: &MatchCase) {
+        self.visit_expr(&case.expr);
+    }
+
     fn visit_let(&mut self, let_: &Let) {
         self.visit_expr(&let_.value);
         self.visit_expr(&let_.body);
@@ -89,6 +101,7 @@ where
         Expr::FieldSelect(field) => visitor.visit_field_select(field),
         Expr::TupleSelect(tuple) => visitor.visit_tuple_select(tuple),
         Expr::Tuple(tuple) => visitor.visit_tuple(tuple),
+        Expr::Match(match_) => visitor.visit_match(match_),
         Expr::Let(let_) => visitor.visit_let(let_),
         Expr::UnaryOp(op) => visitor.visit_unary_op(op),
         Expr::BinaryOp(op) => visitor.visit_binary_op(op),
@@ -119,6 +132,18 @@ pub trait ExprVisitorMut {
         for expr in &mut tuple.items {
             self.visit_expr(expr);
         }
+    }
+
+    fn visit_match(&mut self, match_: &mut Match) {
+        self.visit_expr(&mut match_.scrut);
+
+        for case in &mut match_.cases {
+            self.visit_match_case(case);
+        }
+    }
+
+    fn visit_match_case(&mut self, case: &mut MatchCase) {
+        self.visit_expr(&mut case.expr);
     }
 
     fn visit_let(&mut self, let_: &mut Let) {
@@ -187,6 +212,7 @@ where
         Expr::FieldSelect(field) => visitor.visit_field_select(field),
         Expr::TupleSelect(tuple) => visitor.visit_tuple_select(tuple),
         Expr::Tuple(tuple) => visitor.visit_tuple(tuple),
+        Expr::Match(match_) => visitor.visit_match(match_),
         Expr::Let(let_) => visitor.visit_let(let_),
         Expr::UnaryOp(op) => visitor.visit_unary_op(op),
         Expr::BinaryOp(op) => visitor.visit_binary_op(op),

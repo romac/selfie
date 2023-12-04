@@ -1,5 +1,7 @@
 //! Namer for the Selfie language
 
+#![feature(if_let_guard)]
+
 use std::collections::HashSet;
 
 use selfie_ast::symbols::{EnumSym, FnSym, StructSym, Symbols, VariantSym};
@@ -345,6 +347,49 @@ impl<'a> ExprVisitorMut for NameExprVisitor<'a> {
         todo!()
     }
 
+    fn visit_match_case(&mut self, case: &mut MatchCase) {
+        self.scope.push_new_scope();
+
+        fn visit_pattern(
+            pattern: &mut Pattern,
+            ids: &mut Ids,
+            scope: &mut ScopeStack,
+            errors: &mut Vec<Error>,
+        ) {
+            match pattern {
+                Pattern::Wildcard(_) => (),
+
+                Pattern::Var(v) => {
+                    ids.freshen(&mut v.sym);
+                    scope.add_var(v.sym);
+                }
+
+                Pattern::Enum(epat) => {
+                    if let Some(sym) = epat.ty {
+                        let Some(enum_sym) = scope.get_enum(&sym.name) else {
+                            errors.push(Error::UnknownType(epat.span, sym));
+                            return;
+                        };
+
+                        epat.ty = Some(enum_sym.sym);
+                    }
+
+                    // TODO: Check that variant arg matches definition
+
+                    if let Some(evar) = &mut epat.arg {
+                        visit_pattern(evar, ids, scope, errors);
+                    }
+                }
+            }
+        }
+
+        visit_pattern(&mut case.pattern, self.ids, self.scope, self.errors);
+
+        self.visit_expr(&mut case.expr);
+
+        self.scope.pop_scope();
+    }
+
     fn visit_let(&mut self, let_: &mut Let) {
         self.visit_expr(&mut let_.value);
 
@@ -401,14 +446,20 @@ impl<'a> ExprVisitorMut for NameExprVisitor<'a> {
     }
 
     fn visit_enum_init(&mut self, init: &mut EnumInit) {
-        let Some(sym) = init.sym else { return };
+        let Some(sym) = init.ty else {
+            init.arg
+                .iter_mut()
+                .for_each(|arg| self.visit_expr(arg.as_mut()));
+
+            return;
+        };
 
         let Some(enum_sym) = self.scope.get_enum(&sym.name) else {
             self.errors.push(Error::UnknownType(init.span, sym));
             return;
         };
 
-        init.sym = Some(enum_sym.sym);
+        init.ty = Some(enum_sym.sym);
 
         if let Some(variant_sym) = enum_sym.variants.get(&init.variant.name) {
             init.variant = variant_sym.sym;

@@ -93,8 +93,8 @@ impl Typer {
             }
 
             (Expr::EnumInit(enum_init), Type::Named(sym)) => {
-                if enum_init.sym.is_none() {
-                    enum_init.sym = Some(*sym);
+                if enum_init.ty.is_none() {
+                    enum_init.ty = Some(*sym);
                     self.check_expr(expr, expected)?;
                 }
             }
@@ -143,13 +143,13 @@ impl Typer {
             Expr::MethodCall(_) => todo!(),
             Expr::FieldSelect(field_sel) => self.infer_field_select(field_sel),
             Expr::TupleSelect(tuple_sel) => self.infer_tuple_select(tuple_sel),
+            Expr::Match(match_) => self.infer_match(match_),
             Expr::Tuple(tup) => self.infer_tuple(tup),
             Expr::Let(let_) => self.infer_let(let_),
             Expr::UnaryOp(unop) => self.infer_unop(unop),
             Expr::BinaryOp(binop) => self.infer_binop(binop),
             Expr::If(if_) => self.infer_if(if_),
             Expr::StructInit(struct_init) => self.infer_struct_init(struct_init),
-
             Expr::EnumInit(enum_init) => self.infer_enum_init(enum_init),
         }?;
 
@@ -236,6 +236,122 @@ impl Typer {
                 span: field_sel.span(),
             }),
         }
+    }
+
+    fn infer_pattern(
+        &mut self,
+        pattern: &mut Pattern,
+        expected_ty: &Type,
+        vars: &mut Vec<(Sym, Type)>,
+    ) -> Result<(), Error> {
+        match pattern {
+            Pattern::Wildcard(_) => (),
+
+            Pattern::Var(var) => {
+                vars.push((var.sym, expected_ty.clone()));
+            }
+
+            Pattern::Enum(enum_pat) if let Some(enum_sym) = enum_pat.ty => {
+                let enum_ty = self
+                    .ctx
+                    .get_enum(enum_sym)
+                    .cloned()
+                    .expect("enum not found");
+
+                // TODO: Check enum type matches scrutinee type
+
+                let (variant_sym, arg_ty) = enum_ty
+                    .variants
+                    .iter()
+                    .find(|(v, _)| v.name == enum_pat.variant.name)
+                    .ok_or_else(|| Error::VariantNotFound {
+                        sym: enum_sym,
+                        variant: enum_pat.variant,
+                        span: enum_pat.span(),
+                    })?;
+
+                enum_pat.variant = *variant_sym;
+
+                // TODO: Check arg pattern is of right type
+
+                if let Some((arg_pat, arg_ty)) = enum_pat.arg.as_mut().zip(arg_ty.as_ref()) {
+                    self.infer_pattern(arg_pat, arg_ty, vars)?;
+                }
+            }
+
+            Pattern::Enum(enum_pat) => match expected_ty {
+                Type::Named(sym) => {
+                    let enum_ty = self.ctx.get_enum(*sym).cloned().expect("enum not found");
+                    // FIXME: Check that type is an enum
+
+                    let (variant_sym, arg_ty) = enum_ty
+                        .variants
+                        .iter()
+                        .find(|(v, _)| v.name == enum_pat.variant.name)
+                        .ok_or_else(|| Error::VariantNotFound {
+                            sym: *sym,
+                            variant: enum_pat.variant,
+                            span: enum_pat.span(),
+                        })?;
+
+                    enum_pat.variant = *variant_sym;
+
+                    // TODO: Check arg pattern is of right type
+
+                    if let Some((arg_pat, arg_ty)) = enum_pat.arg.as_mut().zip(arg_ty.as_ref()) {
+                        self.infer_pattern(arg_pat, arg_ty, vars)?;
+                    }
+                }
+
+                _ => {
+                    // FIXME: Return proper error
+                    return Err(Error::AmbiguousEnumVariant {
+                        span: enum_pat.span(),
+                        variant: enum_pat.variant,
+                    });
+                }
+            },
+        }
+
+        Ok(())
+    }
+
+    pub fn infer_match(&mut self, match_: &mut Match) -> Result<Type, Error> {
+        let scrut_ty = self.infer_expr(&mut match_.scrut)?;
+
+        let mut case_tys = Vec::with_capacity(match_.cases.len());
+
+        for case in &mut match_.cases {
+            let mut vars = Vec::new();
+
+            self.infer_pattern(&mut case.pattern, &scrut_ty, &mut vars)?;
+
+            for (sym, ty) in vars {
+                self.ctx.add_var(sym, ty);
+            }
+
+            let case_ty = self.infer_expr(&mut case.expr)?;
+            case_tys.push((case.span(), case_ty));
+        }
+
+        // Check all cases have the same type
+        let (first_case_span, first_case_ty) = case_tys
+            .first()
+            .expect("match expression must have at least one case");
+        // TODO: Enforce non-empty match
+
+        for (case_span, case_ty) in case_tys.iter().skip(1) {
+            if case_ty != first_case_ty {
+                return Err(Error::MismatchedMatchArms {
+                    expected: first_case_ty.clone(),
+                    actual: case_ty.clone(),
+                    span: *case_span,
+                    first_span: *first_case_span,
+                });
+            }
+        }
+
+        Ok(first_case_ty.clone())
     }
 
     pub fn infer_tuple(&mut self, tup: &mut Tuple) -> Result<Type, Error> {
@@ -365,7 +481,7 @@ impl Typer {
     }
 
     pub fn infer_enum_init(&mut self, enum_init: &mut EnumInit) -> Result<Type, Error> {
-        let Some(sym) = enum_init.sym else {
+        let Some(sym) = enum_init.ty else {
             return Err(Error::AmbiguousEnumVariant {
                 span: enum_init.span(),
                 variant: enum_init.variant,

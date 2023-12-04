@@ -127,7 +127,10 @@ pub fn parse_field() -> impl Parser<Field> {
 }
 
 pub fn parse_enum() -> impl Parser<EnumDecl> {
-    let variants = parse_variant().repeated().collect::<Vec<_>>();
+    let variants = parse_variant()
+        .separated_by(just(Token::Comma))
+        .allow_trailing()
+        .collect::<Vec<_>>();
 
     just(Token::Enum)
         .ignore_then(parse_upper())
@@ -261,7 +264,7 @@ pub fn parse_expr() -> impl Parser<Expr> {
 }
 
 pub fn parse_var() -> impl Parser<Var> {
-    parse_identifier().map_with(|sym, meta| Var {
+    parse_lower().map_with(|sym, meta| Var {
         sym,
         span: meta.span(),
     })
@@ -276,6 +279,7 @@ pub fn parse_atom(expr: impl Parser<Expr>) -> impl Parser<Expr> {
         parse_if(expr.clone()).map(Expr::If),
         parse_let(expr.clone()).map(Expr::Let),
         parse_tuple(expr.clone()).map(Expr::Tuple),
+        parse_match(expr.clone()).map(Expr::Match),
         parens(expr.clone()),
         parse_var().map(Expr::Var),
     ));
@@ -398,6 +402,50 @@ fn parse_tuple(expr: impl Parser<Expr>) -> impl Parser<Tuple> {
     })
 }
 
+fn parse_pattern() -> impl Parser<Pattern> {
+    recursive(|pat| {
+        choice((
+            just(Token::Under).map_with(|_, meta| Pattern::Wildcard(meta.span())),
+            parse_var().map(Pattern::Var),
+            parse_enum_init_generic(pat.map(Box::new)).map_with(|(ty, variant, arg), meta| {
+                Pattern::Enum(EnumPattern {
+                    ty,
+                    variant,
+                    arg,
+                    span: meta.span(),
+                })
+            }),
+        ))
+    })
+}
+
+fn parse_match(expr: impl Parser<Expr>) -> impl Parser<Match> {
+    let cases = parse_case(expr.clone())
+        .separated_by(just(Token::Comma))
+        .allow_trailing()
+        .collect::<Vec<_>>();
+
+    just(Token::Match)
+        .ignore_then(expr.clone())
+        .then(braces(cases))
+        .map_with(|(scrut, cases), meta| Match {
+            scrut: Box::new(scrut),
+            cases,
+            span: meta.span(),
+        })
+}
+
+fn parse_case(expr: impl Parser<Expr>) -> impl Parser<MatchCase> {
+    parse_pattern()
+        .then_ignore(just(Token::FatArrow))
+        .then(expr)
+        .map_with(|(pat, expr), meta| MatchCase {
+            pattern: pat,
+            expr,
+            span: meta.span(),
+        })
+}
+
 pub fn parse_struct_init(expr: impl Parser<Expr>) -> impl Parser<StructInit> {
     let args = parse_named_arg(expr)
         .separated_by(just(Token::Comma))
@@ -427,7 +475,7 @@ pub fn parse_arg(expr: impl Parser<Expr>) -> impl Parser<Arg> {
 }
 
 pub fn parse_named_arg(expr: impl Parser<Expr>) -> impl Parser<NamedArg> {
-    parse_identifier()
+    parse_lower()
         .then_ignore(just(Token::Colon))
         .then(expr)
         .map_with(|(sym, value), meta| NamedArg {
@@ -437,18 +485,24 @@ pub fn parse_named_arg(expr: impl Parser<Expr>) -> impl Parser<NamedArg> {
         })
 }
 
-pub fn parse_enum_init(expr: impl Parser<Expr>) -> impl Parser<EnumInit> {
+pub fn parse_enum_init_generic<A>(
+    arg: impl Parser<A>,
+) -> impl Parser<(Option<Sym>, Sym, Option<A>)> {
     parse_upper()
         .or_not()
         .then_ignore(just(Token::Dot))
         .then(parse_lower())
-        .then(parens(expr.map(Box::new)).or_not())
-        .map_with(|((id, variant), arg), meta| EnumInit {
-            sym: id,
-            variant,
-            arg,
-            span: meta.span(),
-        })
+        .then(parens(arg).or_not())
+        .map(|((id, variant), arg)| (id, variant, arg))
+}
+
+pub fn parse_enum_init(expr: impl Parser<Expr>) -> impl Parser<EnumInit> {
+    parse_enum_init_generic(expr.clone()).map_with(|(id, variant, arg), meta| EnumInit {
+        ty: id,
+        variant,
+        arg: arg.map(Box::new),
+        span: meta.span(),
+    })
 }
 
 fn braces<A>(p: impl Parser<A>) -> impl Parser<A> {
