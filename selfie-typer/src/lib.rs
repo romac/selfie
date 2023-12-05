@@ -191,8 +191,9 @@ impl Typer {
             Literal::Int64(_, _) => Ok(Type::Int64),
             Literal::Float64(_, _) => Ok(Type::Float64),
             Literal::Bool(_, _) => Ok(Type::Bool),
-            Literal::String(_, _) => Ok(Type::String),
+            Literal::Char(_, _) => Ok(Type::Char),
             Literal::Unit(_) => Ok(Type::Unit),
+            Literal::String(_, _) => Ok(Type::String),
         }
     }
 

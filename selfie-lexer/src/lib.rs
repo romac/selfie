@@ -27,6 +27,9 @@ pub enum Error {
     #[error("invalid string literal: {1}")]
     InvalidStringLiteral(Span, Ustr),
 
+    #[error("invalid char literal: {1}")]
+    InvalidCharLiteral(Span, Ustr),
+
     #[default]
     #[error("other")]
     Other,
@@ -39,12 +42,15 @@ impl Error {
             Self::ParseInt(span, _) => span,
             Self::ParseFloat(span, _) => span,
             Self::InvalidStringLiteral(span, _) => span,
+            Self::InvalidCharLiteral(span, _) => span,
             Self::Other => unreachable!(),
         }
     }
 }
 
 mod lexers {
+    use crate::util::parse_char;
+
     use super::*;
 
     pub fn auto<T>(lex: &mut Lexer<Token>) -> Option<T>
@@ -60,6 +66,15 @@ mod lexers {
             .into_result()
             .map(|s| Ustr::from(&s))
             .map_err(|_| Error::InvalidStringLiteral(lex.span(), Ustr::from(lex.slice())))
+    }
+
+    pub fn char(lex: &mut Lexer<Token>) -> Result<char, Error> {
+        dbg!(lex.slice());
+        parse_char()
+            .parse(lex.slice())
+            .into_result()
+            .map(|c| dbg!(c))
+            .map_err(|_| Error::InvalidCharLiteral(lex.span(), Ustr::from(lex.slice())))
     }
 
     pub fn int(lex: &mut Lexer<Token>) -> Result<i64, Error> {
@@ -97,6 +112,9 @@ pub enum Token {
 
     #[regex("true|false", lexers::auto)]
     Bool(bool),
+
+    #[regex(r"'(?:[^']|\\')*'", lexers::char)]
+    Char(char),
 
     #[regex("\"([^\"\\]|\\[.])*\"", lexers::string)]
     String(Ustr),
@@ -222,7 +240,8 @@ impl fmt::Display for Token {
             Int64(i) => write!(f, "{i}"),
             Float64(i) => write!(f, "{i}"),
             Bool(b) => write!(f, "{b}"),
-            String(s) => write!(f, "\"{s}\""),
+            Char(c) => write!(f, "{c:?}"),
+            String(s) => write!(f, "{s:?}"),
             Comment => Ok(()),
             Module => write!(f, "module"),
             Fn => write!(f, "fn"),
@@ -273,6 +292,7 @@ pub fn lex(input: &str) -> Result<Vec<(Token, Span)>, Error> {
             Ok(token) => tokens.push((token, lexer.span())),
 
             Err(Error::Other) => {
+                dbg!(lexer.slice());
                 return Err(Error::UnexpectedToken(
                     lexer.span(),
                     Ustr::from(lexer.slice()),
@@ -332,6 +352,24 @@ mod tests {
                 Token::Int64(-123)
             ]
         );
+    }
+
+    #[test]
+    fn lex_char() {
+        let tokens = toks("'a'").unwrap();
+        assert_eq!(tokens, vec![Token::Char('a')]);
+
+        let tokens = toks("'\\n'").unwrap();
+        assert_eq!(tokens, vec![Token::Char('\n')]);
+
+        let tokens = toks("'\\u{7FFF}'").unwrap();
+        assert_eq!(tokens, vec![Token::Char('翿')]);
+
+        let tokens = toks("'\\u{1F60D}'").unwrap();
+        assert_eq!(tokens, vec![Token::Char('😍')]);
+
+        let tokens = toks("'\\''").unwrap();
+        assert_eq!(tokens, vec![Token::Char('\'')]);
     }
 
     #[test]

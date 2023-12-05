@@ -11,3 +11,12 @@ fn strings(): Unit {
   "
   ()
 }
+
+enum String {
+  .empty,
+  .cons((Char, String)),
+}
+
+fn foobar(): Char {
+  '\n'
+}

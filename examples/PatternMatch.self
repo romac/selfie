@@ -63,7 +63,3 @@ fn sum(_ list: IntList): Int64 {
   }
 }
 
-enum String {
-  .empty,
-  .cons((Char, String)),
-}

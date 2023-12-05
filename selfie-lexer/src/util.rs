@@ -79,6 +79,7 @@ fn parse_escaped_char<'a>() -> impl Parser<'a, &'a str, char> {
             just('\\').to('\\'),
             just('/').to('/'),
             just('"').to('"'),
+            just('\'').to('\''),
         )),
     )
 }
@@ -144,4 +145,13 @@ pub fn parse_string<'a>() -> impl Parser<'a, &'a str, String> {
     // `delimited` with a looping parser (like fold_many0), be sure that the
     // loop won't accidentally match your closing delimiter!
     build_string.delimited_by(just('"'), just('"'))
+}
+
+pub fn parse_char<'a>() -> impl Parser<'a, &'a str, char> {
+    let one_char = choice((
+        parse_escaped_char(),
+        any().filter(|&c| c != '\'' && c != '\\'),
+    ));
+
+    one_char.delimited_by(just('\''), just('\''))
 }

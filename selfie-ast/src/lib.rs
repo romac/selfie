@@ -56,8 +56,9 @@ pub enum Literal {
     Int64(Span, i64),
     Float64(Span, OrderedFloat<f64>),
     Bool(Span, bool),
-    String(Span, Ustr),
+    Char(Span, char),
     Unit(Span),
+    String(Span, Ustr),
 }
 
 impl Literal {
@@ -66,8 +67,9 @@ impl Literal {
             Self::Int64(span, _) => *span,
             Self::Float64(span, _) => *span,
             Self::Bool(span, _) => *span,
-            Self::String(span, _) => *span,
+            Self::Char(span, _) => *span,
             Self::Unit(span) => *span,
+            Self::String(span, _) => *span,
         }
     }
 }

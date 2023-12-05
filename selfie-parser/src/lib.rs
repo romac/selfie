@@ -292,6 +292,7 @@ pub fn parse_atom(expr: impl Parser<Expr>) -> impl Parser<Expr> {
 pub fn parse_lit() -> impl Parser<Literal> {
     let other = select! {
         Token::String(s) = meta => Literal::String(meta.span(), s),
+        Token::Char(c) = meta => Literal::Char(meta.span(), c),
         Token::Float64(f) = meta => Literal::Float64(meta.span(), f),
         Token::Int64(i) = meta => Literal::Int64(meta.span(), i),
         Token::Bool(b) = meta => Literal::Bool(meta.span(), b),
