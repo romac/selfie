@@ -50,3 +50,15 @@ fn takeEverySecond(_ list: List): List {
     .cons(.cons(tail)) => .cons(takeEverySecond(tail)),
   }
 }
+
+enum IntList {
+  .nil,
+  .cons((Int64, IntList)),
+}
+
+fn sum(_ list: IntList): Int64 {
+  match list {
+    .nil => 0,
+    .cons((head, tail)) => head + sum(tail),
+  }
+}

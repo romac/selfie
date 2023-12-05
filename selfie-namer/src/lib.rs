@@ -364,6 +364,12 @@ impl<'a> ExprVisitorMut for NameExprVisitor<'a> {
                     scope.add_var(v.sym);
                 }
 
+                Pattern::Tuple(tpat) => {
+                    for pat in &mut tpat.items {
+                        visit_pattern(pat, ids, scope, errors);
+                    }
+                }
+
                 Pattern::Enum(epat) => {
                     if let Some(sym) = epat.ty {
                         let Some(enum_sym) = scope.get_enum(&sym.name) else {

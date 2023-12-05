@@ -274,6 +274,18 @@ impl Typer {
                 vars.push((var.sym, expected_ty.clone()));
             }
 
+            Pattern::Tuple(tuple_pat) => match expected_ty {
+                Type::Tuple(tys) => {
+                    for (pat, ty) in tuple_pat.items.iter_mut().zip(tys) {
+                        self.infer_pattern(pat, ty, vars)?;
+                    }
+                }
+
+                _ => {
+                    todo!()
+                }
+            },
+
             Pattern::Enum(enum_pat) if let Some(enum_sym) = enum_pat.ty => {
                 let enum_ty = self
                     .ctx

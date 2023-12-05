@@ -390,14 +390,18 @@ pub fn parse_let(expr: impl Parser<Expr>) -> impl Parser<Let> {
         })
 }
 
-fn parse_tuple(expr: impl Parser<Expr>) -> impl Parser<Tuple> {
-    let items = expr
+fn parse_tuple_generic<A>(item: impl Parser<A>) -> impl Parser<Vec<A>> {
+    let items = item
         .separated_by(just(Token::Comma))
         .at_least(2)
         .allow_trailing()
         .collect::<Vec<_>>();
 
-    parens(items).map_with(|items, meta| Tuple {
+    parens(items)
+}
+
+fn parse_tuple(expr: impl Parser<Expr>) -> impl Parser<Tuple> {
+    parse_tuple_generic(expr).map_with(|items, meta| Tuple {
         items,
         span: meta.span(),
     })
@@ -408,6 +412,12 @@ fn parse_pattern() -> impl Parser<Pattern> {
         choice((
             just(Token::Under).map_with(|_, meta| Pattern::Wildcard(meta.span())),
             parse_var().map(Pattern::Var),
+            parse_tuple_generic(pat.clone()).map_with(|items, meta| {
+                Pattern::Tuple(TuplePattern {
+                    items,
+                    span: meta.span(),
+                })
+            }),
             parse_enum_init_generic(pat.map(Box::new)).map_with(|(ty, variant, arg), meta| {
                 Pattern::Enum(EnumPattern {
                     ty,

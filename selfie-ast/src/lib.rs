@@ -238,7 +238,7 @@ pub struct MatchCase {
 pub enum Pattern {
     Wildcard(Span),
     Var(Var),
-    // Tuple(TuplePattern),
+    Tuple(TuplePattern),
     // Struct(StructPattern),
     Enum(EnumPattern),
 }
@@ -248,9 +248,16 @@ impl Pattern {
         match self {
             Self::Wildcard(span) => *span,
             Self::Var(var) => var.span(),
+            Self::Tuple(tuple) => tuple.span(),
             Self::Enum(enum_) => enum_.span(),
         }
     }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct TuplePattern {
+    pub span: Span,
+    pub items: Vec<Pattern>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -315,6 +322,7 @@ impl_span!(
     Tuple,
     Match,
     MatchCase,
+    TuplePattern,
     EnumPattern
 );
 
