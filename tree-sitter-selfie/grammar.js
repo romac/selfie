@@ -50,7 +50,11 @@ module.exports = grammar({
       ')'
     ),
 
-    alias: $ => $._lower,
+    alias: $ => choice(
+      $._under,
+      $._lower
+    ),
+
     name: $ => $._lower,
 
     parameter: $ => seq(
@@ -74,8 +78,9 @@ module.exports = grammar({
 
     enum_body: $ => seq(
       '{',
-      repeat($.enum_case),
-      '}'
+      commaSep($.enum_case),
+      optional(','),
+      '}',
     ),
 
     enum_case: $ => seq(
@@ -85,7 +90,7 @@ module.exports = grammar({
         '(',
         commaSep1($.type),
         ')'
-      ))
+      )),
     ),
 
     block: $ => seq(
@@ -94,13 +99,14 @@ module.exports = grammar({
       '}'
     ),
 
-    variable: $ => prec(2, $._lower),
+    variable: $ => prec(2, choice($._under, $._lower)),
 
     expression: $ => choice(
       $.binary_expression,
       $.call_expression,
       $.tuple_expression,
       $.literal,
+      $.match_expression,
       $.let_expression,
       $.if_expression,
       $.variable,
@@ -108,6 +114,44 @@ module.exports = grammar({
       $.tuple_access,
       $.struct_constructor_call,
       $.enum_constructor_call
+    ),
+
+    match_expression: $ => seq(
+      'match',
+      $.expression,
+      '{',
+      commaSep1($.match_arm),
+      optional(','),
+      '}'
+    ),
+
+    match_arm: $ => seq(
+      $.pattern,
+      '=>',
+      $.expression
+    ),
+
+    pattern: $ => choice(
+      $.tuple_pattern,
+      $.enum_pattern,
+      $.variable,
+    ),
+
+    tuple_pattern: $ => seq(
+      '(',
+      commaSep1($.pattern),
+      ')'
+    ),
+
+    enum_pattern: $ => seq(
+      optional($.type),
+      '.',
+      $.variant,
+      optional(seq(
+        '(',
+        commaSep1($.pattern),
+        ')'
+      ))
     ),
 
     let_expression: $ => prec(2, seq(
@@ -143,8 +187,7 @@ module.exports = grammar({
     )),
 
     call_argument: $ => seq(
-      $.name,
-      ':',
+      optional(seq($.name, ':')),
       $.expression
     ),
 
@@ -220,6 +263,7 @@ module.exports = grammar({
 
     _upper: $ => /[A-Z][a-zA-Z0-9_]*/,
     _lower: $ => /[a-z][a-zA-Z0-9_]*/,
+    _under: $ => /_/,
 
     unop: $ => choice('-', '!'),
     binop: $ => choice('+', '-', '*', '/', '%', '==', '!=', '<', '<=', '>', '>=', '&&', '||'),
