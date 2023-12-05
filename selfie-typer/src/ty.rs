@@ -8,9 +8,10 @@ use selfie_ast::Sym;
 pub enum Type {
     Int64,
     Float64,
-    String,
     Bool,
+    Char,
     Unit,
+    String,
     Tuple(Vec<Type>),
     Named(Sym),
     Fn(FnType),
@@ -22,9 +23,10 @@ impl From<&selfie_ast::Type> for Type {
         match value {
             selfie_ast::Type::Int64(_) => Type::Int64,
             selfie_ast::Type::Float64(_) => Type::Float64,
-            selfie_ast::Type::String(_) => Type::String,
             selfie_ast::Type::Bool(_) => Type::Bool,
+            selfie_ast::Type::Char(_) => Type::Char,
             selfie_ast::Type::Unit(_) => Type::Unit,
+            selfie_ast::Type::String(_) => Type::String,
             selfie_ast::Type::Tuple(_, tys) => Type::Tuple(tys.iter().map(Type::from).collect()),
             selfie_ast::Type::Named(_, sym) => Type::Named(*sym),
             selfie_ast::Type::Fn { args, ret, .. } => Type::Fn(FnType {
@@ -47,9 +49,10 @@ impl fmt::Display for Type {
             Type::Unknown => write!(f, "{{unknown}}"),
             Type::Int64 => write!(f, "Int64"),
             Type::Float64 => write!(f, "Float64"),
-            Type::String => write!(f, "String"),
             Type::Bool => write!(f, "Bool"),
+            Type::Char => write!(f, "Char"),
             Type::Unit => write!(f, "Unit"),
+            Type::String => write!(f, "String"),
             Type::Tuple(tys) => {
                 write!(f, "(")?;
                 for (i, ty) in tys.iter().enumerate() {

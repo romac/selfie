@@ -9,6 +9,7 @@ pub trait TypeVisitor {
     fn visit_float64(&mut self, _span: Span) {}
     fn visit_string(&mut self, _span: Span) {}
     fn visit_bool(&mut self, _span: Span) {}
+    fn visit_char(&mut self, _span: Span) {}
     fn visit_unit(&mut self, _span: Span) {}
 
     fn visit_tuple(&mut self, _span: Span, tys: &[Type]) {
@@ -35,9 +36,10 @@ where
     match ty {
         Type::Int64(span) => visitor.visit_int64(*span),
         Type::Float64(span) => visitor.visit_float64(*span),
-        Type::String(span) => visitor.visit_string(*span),
         Type::Bool(span) => visitor.visit_bool(*span),
+        Type::Char(span) => visitor.visit_char(*span),
         Type::Unit(span) => visitor.visit_unit(*span),
+        Type::String(span) => visitor.visit_string(*span),
         Type::Tuple(span, tys) => visitor.visit_tuple(*span, tys),
         Type::Named(span, sym) => visitor.visit_named(*span, sym),
         Type::Fn { span, args, ret } => visitor.visit_fn(*span, args, ret),
@@ -53,6 +55,7 @@ pub trait TypeVisitorMut {
     fn visit_float64(&mut self, _span: Span) {}
     fn visit_string(&mut self, _span: Span) {}
     fn visit_bool(&mut self, _span: Span) {}
+    fn visit_char(&mut self, _span: Span) {}
     fn visit_unit(&mut self, _span: Span) {}
 
     fn visit_tuple(&mut self, _span: Span, tys: &mut [Type]) {
@@ -79,9 +82,10 @@ where
     match ty {
         Type::Int64(span) => visitor.visit_int64(*span),
         Type::Float64(span) => visitor.visit_float64(*span),
-        Type::String(span) => visitor.visit_string(*span),
         Type::Bool(span) => visitor.visit_bool(*span),
+        Type::Char(span) => visitor.visit_char(*span),
         Type::Unit(span) => visitor.visit_unit(*span),
+        Type::String(span) => visitor.visit_string(*span),
         Type::Tuple(span, tys) => visitor.visit_tuple(*span, tys),
         Type::Named(span, sym) => visitor.visit_named(*span, sym),
         Type::Fn { span, args, ret } => visitor.visit_fn(*span, args, ret),

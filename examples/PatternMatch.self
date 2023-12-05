@@ -62,3 +62,8 @@ fn sum(_ list: IntList): Int64 {
     .cons((head, tail)) => head + sum(tail),
   }
 }
+
+enum String {
+  .empty,
+  .cons((Char, String)),
+}

@@ -74,6 +74,7 @@ pub fn parse_type() -> impl Parser<Type> {
             "String" => Type::String(span),
             "Bool" => Type::Bool(span),
             "Unit" => Type::Unit(span),
+            "Char" => Type::Char(span),
             "Int64" => Type::Int64(span),
             "Float64" => Type::Float64(span),
             _ => Type::Named(span, sym),

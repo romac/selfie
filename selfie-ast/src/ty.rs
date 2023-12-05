@@ -4,9 +4,10 @@ use crate::{Span, Sym};
 pub enum Type {
     Int64(Span),
     Float64(Span),
-    String(Span),
     Bool(Span),
+    Char(Span),
     Unit(Span),
+    String(Span),
     Tuple(Span, Vec<Type>),
     Named(Span, Sym),
     Fn {
@@ -22,9 +23,10 @@ impl Type {
         match self {
             Type::Int64(span) => *span,
             Type::Float64(span) => *span,
-            Type::String(span) => *span,
             Type::Bool(span) => *span,
+            Type::Char(span) => *span,
             Type::Unit(span) => *span,
+            Type::String(span) => *span,
             Type::Tuple(span, _) => *span,
             Type::Named(span, _) => *span,
             Type::Fn { span, .. } => *span,
