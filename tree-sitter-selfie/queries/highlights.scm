@@ -5,7 +5,7 @@
 "let"    @keyword
 "if"     @keyword
 "else"   @keyword
-;; "match"  @keyword
+"match"  @keyword
 
 "(" @punctuation.bracket
 ")" @punctuation.bracket
@@ -40,7 +40,7 @@
 (function_declaration (name) @function)
 (call_expression (name)      @function)
 
-;; (char_literal) @string
+(char_literal) @string
 (string_literal) @string
 
 (boolean_literal) @constant.builtin

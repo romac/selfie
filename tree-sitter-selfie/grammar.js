@@ -233,10 +233,13 @@ module.exports = grammar({
     comment: $ => token(seq('//', /.*/)),
 
     literal: $ => choice(
+      $.char_literal,
       $.integer_literal,
       $.string_literal,
       $.boolean_literal
     ),
+
+    char_literal: $ => /'[^']+'/,
 
     integer_literal: $ => /\d+/,
 

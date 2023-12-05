@@ -1019,6 +1019,10 @@
       "members": [
         {
           "type": "SYMBOL",
+          "name": "char_literal"
+        },
+        {
+          "type": "SYMBOL",
           "name": "integer_literal"
         },
         {
@@ -1030,6 +1034,10 @@
           "name": "boolean_literal"
         }
       ]
+    },
+    "char_literal": {
+      "type": "PATTERN",
+      "value": "'[^']+'"
     },
     "integer_literal": {
       "type": "PATTERN",
