@@ -30,3 +30,23 @@ fn length(_ list: List): Int64 {
     .cons(tail) => 1 + length(tail),
   }
 }
+
+fn take(_ list: List, _ n: Int64): List {
+  match list {
+    .nil => List.nil,
+    .cons(tail) =>
+      if n <= 0 {
+        .nil
+      } else {
+        .cons(take(tail, n - 1))
+      }
+  }
+}
+
+fn takeEverySecond(_ list: List): List {
+  match list {
+    .nil => List.nil,
+    .cons(.nil) => List.nil,
+    .cons(.cons(tail)) => .cons(takeEverySecond(tail)),
+  }
+}

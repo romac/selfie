@@ -89,6 +89,7 @@ impl Typer {
             (Expr::Tuple(tup), Type::Tuple(tys)) => {
                 self.check_tup(tup, tys)?;
                 self.ctx.add_expr(expr, expected.clone());
+
                 return Ok(());
             }
 
@@ -97,18 +98,40 @@ impl Typer {
                     enum_init.ty = Some(*sym);
                     self.check_expr(expr, expected)?;
                 }
+
+                return Ok(());
             }
 
             (Expr::If(if_), ty) => {
                 self.check_expr(&mut if_.cnd, &Type::Bool)?;
                 self.check_expr(&mut if_.thn, ty)?;
                 self.check_expr(&mut if_.els, ty)?;
+
+                return Ok(());
             }
 
             (Expr::Let(let_), ty) => {
                 let value_ty = self.infer_expr(&mut let_.value)?;
                 self.ctx.add_var(let_.sym, value_ty.clone());
                 self.check_expr(&mut let_.body, ty)?;
+
+                return Ok(());
+            }
+
+            (Expr::Match(match_), ty) => {
+                let scrut_ty = self.infer_expr(&mut match_.scrut)?;
+
+                for case in &mut match_.cases {
+                    let mut vars = Vec::new();
+
+                    self.infer_pattern(&mut case.pattern, &scrut_ty, &mut vars)?;
+
+                    for (sym, ty) in vars {
+                        self.ctx.add_var(sym, ty);
+                    }
+
+                    self.check_expr(&mut case.expr, ty)?;
+                }
             }
 
             _ => (),

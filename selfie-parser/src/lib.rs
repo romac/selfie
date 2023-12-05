@@ -281,6 +281,7 @@ pub fn parse_atom(expr: impl Parser<Expr>) -> impl Parser<Expr> {
         parse_tuple(expr.clone()).map(Expr::Tuple),
         parse_match(expr.clone()).map(Expr::Match),
         parens(expr.clone()),
+        braces(expr.clone()),
         parse_var().map(Expr::Var),
     ));
 
