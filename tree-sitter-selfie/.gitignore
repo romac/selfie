@@ -1,1 +1,7 @@
 target/
+binding.gyp
+bindings/
+Cargo.lock
+Cargo.toml
+src
+tree-sitter-selfie.wasm
