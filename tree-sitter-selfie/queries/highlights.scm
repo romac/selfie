@@ -5,6 +5,7 @@
 "let"    @keyword
 "if"     @keyword
 "else"   @keyword
+;; "match"  @keyword
 
 "(" @punctuation.bracket
 ")" @punctuation.bracket
@@ -19,20 +20,20 @@
 ","  @punctuation.delimiter
 ";"  @punctuation.delimiter
 
-(type)    @type
+(type)                 @type
 
-(field)                 @property
-(variant)               @property
+(field)                @property
+(variant)              @property
 
-(struct_declaration)  @type.declaration
-(enum_declaration)    @type.declaration
+(struct_declaration)   @type.declaration
+(enum_declaration)     @type.declaration
 
 (function_declaration) @local.scope
 (variable)             @local.reference
 (variable)             @variable
 
-(parameter     (name) @variable.parameter)
-(call_argument (name) @variable.parameter)
+(parameter     (name)  @variable.parameter)
+(call_argument (name)  @variable.parameter)
 
 (let_expression (name) @local.definition)
 
