@@ -4,3 +4,4 @@ TODO:
   - Disambiguate after typing
 - [ast, parser] Add an ExprId to all exprs
 - [namer] Use parameters names in function symbol to allow for functions with same name but different parameters
+- [ast] More complete Visitor trait for Decl etc., cf. https://thume.ca/2019/04/18/writing-a-compiler-in-rust/
