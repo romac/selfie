@@ -97,13 +97,13 @@ pub fn parse_type() -> impl Parser<Type> {
 
 pub fn parse_decl() -> impl Parser<Decl> {
     choice((
-        parse_fn().map(Decl::Fn),
-        parse_struct().map(Decl::Struct),
-        parse_enum().map(Decl::Enum),
+        parse_fn_decl().map(Decl::Fn),
+        parse_struct_decl().map(Decl::Struct),
+        parse_enum_decl().map(Decl::Enum),
     ))
 }
 
-pub fn parse_struct() -> impl Parser<StructDecl> {
+pub fn parse_struct_decl() -> impl Parser<StructDecl> {
     let fields = parse_field().repeated().collect::<Vec<_>>();
 
     just(Token::Struct)
@@ -127,11 +127,8 @@ pub fn parse_field() -> impl Parser<Field> {
         })
 }
 
-pub fn parse_enum() -> impl Parser<EnumDecl> {
-    let variants = parse_variant()
-        .separated_by(just(Token::Comma))
-        .allow_trailing()
-        .collect::<Vec<_>>();
+pub fn parse_enum_decl() -> impl Parser<EnumDecl> {
+    let variants = parse_variant().repeated().collect::<Vec<_>>();
 
     just(Token::Enum)
         .ignore_then(parse_upper())
@@ -154,7 +151,7 @@ pub fn parse_variant() -> impl Parser<Variant> {
         })
 }
 
-fn parse_fn() -> impl Parser<FnDecl> {
+fn parse_fn_decl() -> impl Parser<FnDecl> {
     let params = parse_param()
         .separated_by(just(Token::Comma))
         .allow_trailing()

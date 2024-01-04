@@ -1,4 +1,4 @@
-module PatternMatch
+module Eval
 
 enum Option {
   .none
@@ -63,3 +63,6 @@ fn sum(_ list: IntList): Int64 {
   }
 }
 
+fn main(): Unit {
+  
+}
