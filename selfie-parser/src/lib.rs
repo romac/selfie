@@ -3,7 +3,7 @@
 use std::path::Path;
 
 use chumsky::input::{Input, SpannedInput, Stream};
-use chumsky::primitive::{choice, end, just};
+use chumsky::primitive::{any, choice, end, just};
 use chumsky::recursive::recursive;
 use chumsky::{extra, select, IterParser};
 
@@ -103,14 +103,32 @@ pub fn parse_decl() -> impl Parser<Decl> {
     ))
 }
 
+pub fn parse_attr() -> impl Parser<Attribute> {
+    let params = any()
+        .filter(|&t| t != Token::ParenClose)
+        .repeated()
+        .collect();
+
+    just(Token::At)
+        .ignore_then(parse_lower())
+        .then(parens(params))
+        .map_with(|(sym, params), meta| Attribute::new(meta.span(), sym, params))
+}
+
+pub fn parse_attrs() -> impl Parser<Vec<Attribute>> {
+    parse_attr().repeated().collect::<Vec<_>>()
+}
+
 pub fn parse_struct_decl() -> impl Parser<StructDecl> {
     let fields = parse_field().repeated().collect::<Vec<_>>();
 
-    just(Token::Struct)
-        .ignore_then(parse_upper())
+    parse_attrs()
+        .then_ignore(just(Token::Struct))
+        .then(parse_upper())
         .then(braces(fields))
-        .map_with(|(sym, fields), meta| StructDecl {
+        .map_with(|((attrs, sym), fields), meta| StructDecl {
             sym,
+            attrs,
             fields,
             span: meta.span(),
         })
@@ -130,11 +148,13 @@ pub fn parse_field() -> impl Parser<Field> {
 pub fn parse_enum_decl() -> impl Parser<EnumDecl> {
     let variants = parse_variant().repeated().collect::<Vec<_>>();
 
-    just(Token::Enum)
-        .ignore_then(parse_upper())
+    parse_attrs()
+        .then_ignore(just(Token::Enum))
+        .then(parse_upper())
         .then(braces(variants))
-        .map_with(|(sym, variants), meta| EnumDecl {
+        .map_with(|((attrs, sym), variants), meta| EnumDecl {
             sym,
+            attrs,
             variants,
             span: meta.span(),
         })
@@ -157,19 +177,23 @@ fn parse_fn_decl() -> impl Parser<FnDecl> {
         .allow_trailing()
         .collect::<Vec<_>>();
 
-    just(Token::Fn)
-        .ignore_then(parse_lower())
+    parse_attrs()
+        .then_ignore(just(Token::Fn))
+        .then(parse_lower())
         .then(parens(params))
         .then_ignore(just(Token::Colon))
         .then(parse_type())
         .then(braces(parse_expr()))
-        .map_with(|(((sym, params), return_type), body), meta| FnDecl {
-            sym,
-            params,
-            return_type,
-            body,
-            span: meta.span(),
-        })
+        .map_with(
+            |((((attrs, sym), params), return_type), body), meta| FnDecl {
+                sym,
+                attrs,
+                params,
+                return_type,
+                body,
+                span: meta.span(),
+            },
+        )
 }
 
 pub fn parse_param() -> impl Parser<Param> {

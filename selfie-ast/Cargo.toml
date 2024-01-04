@@ -5,6 +5,8 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
+selfie-lexer = { path = "../selfie-lexer" }
+
 chumsky.workspace       = true
 ordered-float.workspace = true
 indexmap.workspace      = true

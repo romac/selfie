@@ -98,7 +98,7 @@ mod lexers {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Logos)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Logos)]
 #[logos(skip r"[ \t\n\f]+", error = Error)]
 pub enum Token {
     #[regex("[a-zA-Z_][a-zA-Z0-9_]*", lexers::intern)]
@@ -169,6 +169,9 @@ pub enum Token {
 
     #[token(".")]
     Dot,
+
+    #[token("@")]
+    At,
 
     #[token("->")]
     Arrow,
@@ -259,6 +262,7 @@ impl fmt::Display for Token {
             Semi => write!(f, ";"),
             Comma => write!(f, ","),
             Dot => write!(f, "."),
+            At => write!(f, "@"),
             Arrow => write!(f, "->"),
             FatArrow => write!(f, "=>"),
             Under => write!(f, "_"),

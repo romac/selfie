@@ -1,4 +1,4 @@
-use crate::{impl_span, impl_sym, Expr, Span, Sym, Type};
+use crate::{impl_decl, impl_span, impl_sym, Attribute, Expr, Span, Sym, Type};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Decl {
@@ -29,13 +29,13 @@ impl Decl {
 pub struct FnDecl {
     pub span: Span,
     pub sym: Sym,
+    pub attrs: Vec<Attribute>,
     pub params: Vec<Param>,
     pub return_type: Type,
     pub body: Expr,
 }
 
-impl_sym!(FnDecl);
-impl_span!(FnDecl);
+impl_decl!(FnDecl);
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Param {
@@ -55,15 +55,32 @@ pub enum ParamKind {
     Alias(Sym),
 }
 
+impl ParamKind {
+    #[must_use]
+    pub fn is_anon(&self) -> bool {
+        matches!(self, Self::Anon)
+    }
+
+    #[must_use]
+    pub fn is_normal(&self) -> bool {
+        matches!(self, Self::Normal)
+    }
+
+    #[must_use]
+    pub fn is_alias(&self) -> bool {
+        matches!(self, Self::Alias(..))
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct StructDecl {
     pub span: Span,
     pub sym: Sym,
+    pub attrs: Vec<Attribute>,
     pub fields: Vec<Field>,
 }
 
-impl_sym!(StructDecl);
-impl_span!(StructDecl);
+impl_decl!(StructDecl);
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Field {
@@ -79,11 +96,11 @@ impl_span!(Field);
 pub struct EnumDecl {
     pub span: Span,
     pub sym: Sym,
+    pub attrs: Vec<Attribute>,
     pub variants: Vec<Variant>,
 }
 
-impl_sym!(EnumDecl);
-impl_span!(EnumDecl);
+impl_decl!(EnumDecl);
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Variant {

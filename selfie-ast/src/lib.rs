@@ -3,6 +3,9 @@ pub use ustr::Ustr;
 
 pub type Span = chumsky::span::SimpleSpan<usize, Ustr>;
 
+mod attribute;
+pub use attribute::Attribute;
+
 mod call_graph;
 pub use call_graph::CallGraph;
 
