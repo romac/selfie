@@ -85,6 +85,7 @@ pub struct Var {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Expr {
+    Empty(Span),
     Lit(Literal),
     Var(Var),
     FnCall(FnCall),
@@ -104,6 +105,7 @@ pub enum Expr {
 impl Expr {
     pub fn span(&self) -> Span {
         match self {
+            Self::Empty(span) => *span,
             Self::Lit(lit) => lit.span(),
             Self::Var(var) => var.span(),
             Self::FnCall(call) => call.span(),

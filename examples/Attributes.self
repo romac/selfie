@@ -17,3 +17,6 @@ enum MyEnum {
   .foo
   .bar
 }
+
+@intrinsic(println)
+fn println(_ msg: String): Unit;

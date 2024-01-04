@@ -94,6 +94,7 @@ where
     V: ExprVisitor + ?Sized,
 {
     match expr {
+        Expr::Empty(_) => (),
         Expr::Lit(lit) => visitor.visit_lit(lit),
         Expr::Var(var) => visitor.visit_var(var),
         Expr::FnCall(call) => visitor.visit_fn_call(call),
@@ -205,6 +206,7 @@ where
     V: ExprVisitorMut + ?Sized,
 {
     match expr {
+        Expr::Empty(_) => (),
         Expr::Lit(lit) => visitor.visit_lit(lit),
         Expr::Var(var) => visitor.visit_var(var),
         Expr::FnCall(call) => visitor.visit_fn_call(call),

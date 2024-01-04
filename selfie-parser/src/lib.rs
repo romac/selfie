@@ -177,13 +177,16 @@ fn parse_fn_decl() -> impl Parser<FnDecl> {
         .allow_trailing()
         .collect::<Vec<_>>();
 
+    let body = braces(parse_expr());
+    let empty = just(Token::Semi).map_with(|_, meta| Expr::Empty(meta.span()));
+
     parse_attrs()
         .then_ignore(just(Token::Fn))
         .then(parse_lower())
         .then(parens(params))
         .then_ignore(just(Token::Colon))
         .then(parse_type())
-        .then(braces(parse_expr()))
+        .then(body.or(empty))
         .map_with(
             |((((attrs, sym), params), return_type), body), meta| FnDecl {
                 sym,

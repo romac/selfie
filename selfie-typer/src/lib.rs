@@ -86,6 +86,8 @@ impl Typer {
 
     pub fn check_expr(&mut self, mut expr: &mut Expr, expected: &Type) -> Result<(), Error> {
         match (&mut expr, expected) {
+            (Expr::Empty(_), _) => return Ok(()),
+
             (Expr::Tuple(tup), Type::Tuple(tys)) => {
                 self.check_tup(tup, tys)?;
                 self.ctx.add_expr(expr, expected.clone());
@@ -160,6 +162,7 @@ impl Typer {
 
     pub fn infer_expr(&mut self, expr: &mut Expr) -> Result<Type, Error> {
         let ty = match expr {
+            Expr::Empty(_) => unimplemented!(),
             Expr::Lit(lit) => self.infer_lit(lit),
             Expr::Var(var) => self.infer_var(var),
             Expr::FnCall(fn_call) => self.infer_fn_call(fn_call),
