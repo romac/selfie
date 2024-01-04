@@ -8,6 +8,7 @@ pub struct Symbols {
     pub fns: IndexMap<Name, FnSym>,
     pub structs: IndexMap<Name, StructSym>,
     pub enums: IndexMap<Name, EnumSym>,
+    pub cur_impl: Option<Sym>,
 }
 
 impl Symbols {

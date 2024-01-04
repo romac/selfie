@@ -100,6 +100,7 @@ pub fn parse_decl() -> impl Parser<Decl> {
         parse_fn_decl().map(Decl::Fn),
         parse_struct_decl().map(Decl::Struct),
         parse_enum_decl().map(Decl::Enum),
+        parse_impl().map(Decl::Impl),
     ))
 }
 
@@ -156,6 +157,19 @@ pub fn parse_enum_decl() -> impl Parser<EnumDecl> {
             sym,
             attrs,
             variants,
+            span: meta.span(),
+        })
+}
+
+pub fn parse_impl() -> impl Parser<ImplDecl> {
+    let methods = parse_fn_decl().repeated().collect::<Vec<_>>();
+
+    just(Token::Impl)
+        .ignore_then(parse_upper())
+        .then(braces(methods))
+        .map_with(|(sym, methods), meta| ImplDecl {
+            sym,
+            methods,
             span: meta.span(),
         })
 }
@@ -298,6 +312,7 @@ pub fn parse_var() -> impl Parser<Var> {
 pub fn parse_atom(expr: impl Parser<Expr>) -> impl Parser<Expr> {
     let init = choice((
         parse_lit().map(Expr::Lit),
+        parse_this().map(Expr::This),
         parse_fn_call(expr.clone()).map(Expr::FnCall),
         parse_struct_init(expr.clone()).map(Expr::StructInit),
         parse_enum_init(expr.clone()).map(Expr::EnumInit),
@@ -327,6 +342,13 @@ pub fn parse_lit() -> impl Parser<Literal> {
         .map_with(|_, meta| Literal::Unit(meta.span()));
 
     choice((other, unit))
+}
+
+pub fn parse_this() -> impl Parser<This> {
+    just(Token::This).map_with(|_, meta| This {
+        span: meta.span(),
+        sym: Sym::new(Name::new("this")),
+    })
 }
 
 pub fn parse_field_select_or_method_call(

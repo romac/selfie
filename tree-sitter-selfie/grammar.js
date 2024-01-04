@@ -13,7 +13,8 @@ module.exports = grammar({
       $.module_declaration,
       $.function_declaration,
       $.struct_declaration,
-      $.enum_declaration
+      $.enum_declaration,
+      $.impl_declaration
     ),
 
     module_name: $ => $._upper,
@@ -42,6 +43,14 @@ module.exports = grammar({
       'enum',
       $.type,
       $.enum_body
+    ),
+
+    impl_declaration: $ => seq(
+      'impl',
+      $.type,
+      '{',
+      repeat($.function_declaration),
+      '}'
     ),
 
     parameter_list: $ => seq(
@@ -106,10 +115,12 @@ module.exports = grammar({
       $.call_expression,
       $.tuple_expression,
       $.literal,
+      $.self,
       $.match_expression,
       $.let_expression,
       $.if_expression,
       $.variable,
+      $.method_call,
       $.field_access,
       $.tuple_access,
       $.struct_constructor_call,
@@ -180,6 +191,15 @@ module.exports = grammar({
     ),
 
     call_expression: $ => prec(2, seq(
+      $.name,
+      '(',
+      commaSep($.call_argument),
+      ')'
+    )),
+
+    method_call: $ => prec(1, seq(
+      $.expression,
+      '.',
       $.name,
       '(',
       commaSep($.call_argument),
@@ -261,6 +281,8 @@ module.exports = grammar({
       '.',
       $.variant
     ),
+
+    self: _ => 'self',
 
     identifier: $ => /[a-zA-Z_][a-zA-Z0-9_]*/,
 

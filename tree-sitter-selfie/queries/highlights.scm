@@ -2,6 +2,7 @@
 "fn"     @keyword
 "struct" @keyword
 "enum"   @keyword
+"impl"   @keyword
 "let"    @keyword
 "if"     @keyword
 "else"   @keyword
@@ -32,6 +33,8 @@
 (variable)             @local.reference
 (variable)             @variable
 
+(self) @variable.builtin
+
 (parameter     (name)  @variable.parameter)
 (call_argument (name)  @variable.parameter)
 
@@ -40,7 +43,7 @@
 (function_declaration (name) @function)
 (call_expression (name)      @function)
 
-(char_literal) @string
+(char_literal)   @string
 (string_literal) @string
 
 (boolean_literal) @constant.builtin

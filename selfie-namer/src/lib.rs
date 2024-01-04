@@ -89,28 +89,12 @@ impl Namer {
         }
 
         for decl in &mut module.decls {
-            if let Decl::Fn(fn_decl) = decl {
-                self.name_fn(fn_decl)
+            match decl {
+                Decl::Fn(fn_decl) => self.name_fn(fn_decl),
+                Decl::Impl(impl_decl) => self.name_impl(impl_decl),
+                _ => (),
             }
         }
-    }
-
-    fn name_fn(&mut self, fn_decl: &mut FnDecl) {
-        self.name_type(&mut fn_decl.return_type);
-
-        for param in &mut fn_decl.params {
-            self.name_type(&mut param.ty);
-        }
-
-        let fn_scope = self.scope.get_fn(&fn_decl.sym.name).unwrap();
-
-        let mut expr_scope = Symbols::default();
-        for (param, (sym, _)) in &fn_scope.params {
-            expr_scope.vars.insert(*param, *sym);
-        }
-        self.scope.push_scope(expr_scope);
-
-        self.name_expr(&mut fn_decl.body);
     }
 
     fn name_decl_sig(&mut self, decl: &mut Decl) {
@@ -118,6 +102,7 @@ impl Namer {
             Decl::Fn(fn_decl) => self.name_fn_decl_sig(fn_decl),
             Decl::Struct(struct_decl) => self.name_struct_decl(struct_decl),
             Decl::Enum(enum_decl) => self.name_enum_decl(enum_decl),
+            Decl::Impl(impl_decl) => self.name_impl_decl(impl_decl),
         }
     }
 
@@ -208,6 +193,51 @@ impl Namer {
         }
 
         self.scope.add_enum(enum_sym);
+    }
+
+    fn name_impl_decl(&mut self, decl: &mut ImplDecl) {
+        let impl_scope = Symbols::default();
+
+        self.scope.push_scope(impl_scope);
+
+        for method in &mut decl.methods {
+            self.name_fn_decl_sig(method);
+        }
+
+        self.scope.pop_scope();
+    }
+
+    fn name_impl(&mut self, impl_decl: &mut ImplDecl) {
+        let scope = Symbols {
+            cur_impl: Some(impl_decl.sym),
+            ..Default::default()
+        };
+
+        self.scope.push_scope(scope);
+
+        for method in &mut impl_decl.methods {
+            self.name_fn(method);
+        }
+
+        self.scope.pop_scope();
+    }
+
+    fn name_fn(&mut self, fn_decl: &mut FnDecl) {
+        self.name_type(&mut fn_decl.return_type);
+
+        for param in &mut fn_decl.params {
+            self.name_type(&mut param.ty);
+        }
+
+        let fn_scope = self.scope.get_fn(&fn_decl.sym.name).unwrap();
+
+        let mut expr_scope = Symbols::default();
+        for (param, (sym, _)) in &fn_scope.params {
+            expr_scope.vars.insert(*param, *sym);
+        }
+        self.scope.push_scope(expr_scope);
+
+        self.name_expr(&mut fn_decl.body);
     }
 
     fn name_expr(&mut self, expr: &mut Expr) {

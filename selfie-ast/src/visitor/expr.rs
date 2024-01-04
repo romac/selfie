@@ -7,6 +7,7 @@ pub trait ExprVisitor {
 
     fn visit_lit(&mut self, _lit: &Literal) {}
     fn visit_var(&mut self, _var: &Var) {}
+    fn visit_this(&mut self, _this: &This) {}
 
     fn visit_fn_call(&mut self, call: &FnCall) {
         self.visit_args(&call.args);
@@ -97,6 +98,7 @@ where
         Expr::Empty(_) => (),
         Expr::Lit(lit) => visitor.visit_lit(lit),
         Expr::Var(var) => visitor.visit_var(var),
+        Expr::This(this) => visitor.visit_this(this),
         Expr::FnCall(call) => visitor.visit_fn_call(call),
         Expr::MethodCall(call) => visitor.visit_method_call(call),
         Expr::FieldSelect(field) => visitor.visit_field_select(field),
@@ -119,6 +121,7 @@ pub trait ExprVisitorMut {
 
     fn visit_lit(&mut self, _lit: &mut Literal) {}
     fn visit_var(&mut self, _var: &mut Var) {}
+    fn visit_this(&mut self, _this: &mut This) {}
 
     fn visit_fn_call(&mut self, call: &mut FnCall) {
         self.visit_args(&mut call.args);
@@ -209,6 +212,7 @@ where
         Expr::Empty(_) => (),
         Expr::Lit(lit) => visitor.visit_lit(lit),
         Expr::Var(var) => visitor.visit_var(var),
+        Expr::This(this) => visitor.visit_this(this),
         Expr::FnCall(call) => visitor.visit_fn_call(call),
         Expr::MethodCall(call) => visitor.visit_method_call(call),
         Expr::FieldSelect(field) => visitor.visit_field_select(field),

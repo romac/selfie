@@ -125,6 +125,12 @@ pub enum Token {
     #[token("module")]
     Module,
 
+    #[token("impl")]
+    Impl,
+
+    #[token("self")]
+    This,
+
     #[token("fn")]
     Fn,
 
@@ -247,6 +253,8 @@ impl fmt::Display for Token {
             String(s) => write!(f, "{s:?}"),
             Comment => Ok(()),
             Module => write!(f, "module"),
+            Impl => write!(f, "impl"),
+            This => write!(f, "self"),
             Fn => write!(f, "fn"),
             Struct => write!(f, "struct"),
             Enum => write!(f, "enum"),

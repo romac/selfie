@@ -5,6 +5,7 @@ pub enum Decl {
     Fn(FnDecl),
     Struct(StructDecl),
     Enum(EnumDecl),
+    Impl(ImplDecl),
 }
 
 impl Decl {
@@ -13,6 +14,7 @@ impl Decl {
             Self::Fn(fn_decl) => fn_decl.sym(),
             Self::Struct(struct_decl) => struct_decl.sym(),
             Self::Enum(enum_decl) => enum_decl.sym(),
+            Self::Impl(impl_decl) => impl_decl.sym(),
         }
     }
 
@@ -21,6 +23,7 @@ impl Decl {
             Self::Fn(fn_decl) => fn_decl.span(),
             Self::Struct(struct_decl) => struct_decl.span(),
             Self::Enum(enum_decl) => enum_decl.span(),
+            Self::Impl(impl_decl) => impl_decl.span(),
         }
     }
 }
@@ -111,3 +114,13 @@ pub struct Variant {
 
 impl_sym!(Variant);
 impl_span!(Variant);
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct ImplDecl {
+    pub span: Span,
+    pub sym: Sym,
+    pub methods: Vec<FnDecl>,
+}
+
+impl_span!(ImplDecl);
+impl_sym!(ImplDecl);

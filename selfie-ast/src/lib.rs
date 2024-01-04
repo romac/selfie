@@ -10,7 +10,7 @@ mod call_graph;
 pub use call_graph::CallGraph;
 
 mod decl;
-pub use decl::{Decl, EnumDecl, Field, FnDecl, Param, ParamKind, StructDecl, Variant};
+pub use decl::*;
 
 mod name;
 pub use name::Name;
@@ -83,11 +83,18 @@ pub struct Var {
     pub sym: Sym,
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub struct This {
+    pub span: Span,
+    pub sym: Sym,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Expr {
     Empty(Span),
     Lit(Literal),
     Var(Var),
+    This(This),
     FnCall(FnCall),
     MethodCall(MethodCall),
     FieldSelect(FieldSelect),
@@ -108,6 +115,7 @@ impl Expr {
             Self::Empty(span) => *span,
             Self::Lit(lit) => lit.span(),
             Self::Var(var) => var.span(),
+            Self::This(this) => this.span(),
             Self::FnCall(call) => call.span(),
             Self::MethodCall(call) => call.span(),
             Self::FieldSelect(field) => field.span(),
@@ -315,6 +323,7 @@ pub struct Tuple {
 impl_span!(
     Module,
     Var,
+    This,
     NamedArg,
     BinaryOp,
     UnaryOp,
@@ -333,4 +342,13 @@ impl_span!(
     EnumPattern
 );
 
-impl_sym!(Module, Var, NamedArg, FnCall, MethodCall, FieldSelect, Let);
+impl_sym!(
+    Module,
+    Var,
+    This,
+    NamedArg,
+    FnCall,
+    MethodCall,
+    FieldSelect,
+    Let
+);

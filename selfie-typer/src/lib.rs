@@ -42,6 +42,7 @@ impl Typer {
                 Decl::Fn(fn_decl) => self.ctx.add_fn_decl(fn_decl.sym, fn_decl),
                 Decl::Struct(struct_decl) => self.ctx.add_struct_decl(struct_decl),
                 Decl::Enum(enum_decl) => self.ctx.add_enum_decl(enum_decl),
+                Decl::Impl(_impl_decl) => todo!(),
             }
         }
 
@@ -63,6 +64,7 @@ impl Typer {
             Decl::Fn(fn_decl) => self.type_fn_decl(fn_decl),
             Decl::Struct(struct_decl) => self.type_struct_decl(struct_decl),
             Decl::Enum(enum_decl) => self.type_enum_decl(enum_decl),
+            Decl::Impl(_impl_decl) => todo!(),
         }
     }
 
@@ -165,6 +167,7 @@ impl Typer {
             Expr::Empty(_) => unimplemented!(),
             Expr::Lit(lit) => self.infer_lit(lit),
             Expr::Var(var) => self.infer_var(var),
+            Expr::This(this) => todo!(),
             Expr::FnCall(fn_call) => self.infer_fn_call(fn_call),
             Expr::MethodCall(_) => todo!(),
             Expr::FieldSelect(field_sel) => self.infer_field_select(field_sel),
